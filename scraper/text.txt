@@ -1,0 +1,112 @@
+Programmer
+Backend Developer
+Frontend Developer
+Fullstack Developer
+Web Developer
+Mobile Developer
+Application Developer
+Junior Developer
+Senior Developer
+Lead Developer
+Principal Engineer
+Backend Engineer
+Frontend Engineer
+Fullstack Engineer
+NodeJS Developer
+Java Developer
+Python Developer
+PHP Developer
+.NET Developer
+Golang Developer
+Rust Developer
+C++ Developer
+C Developer
+Ruby Developer
+JavaScript Developer
+TypeScript Developer
+React Developer
+Angular Developer
+Vue Developer
+NextJS Developer
+NestJS Developer
+ExpressJS Developer
+Django Developer
+Flask Developer
+Spring Boot Developer
+Laravel Developer
+Android Developer
+iOS Developer
+Flutter Developer
+React Native Developer
+Mobile Engineer
+Data Analyst
+Data Scientist
+Data Engineer
+Machine Learning Engineer
+AI Engineer
+Deep Learning Engineer
+Business Intelligence Engineer
+Analytics Engineer
+Big Data Engineer
+NLP Engineer
+Computer Vision Engineer
+DevOps Engineer
+Site Reliability Engineer
+Cloud Engineer
+Platform Engineer
+Infrastructure Engineer
+AWS Engineer
+Azure Engineer
+GCP Engineer
+Kubernetes Engineer
+Docker Engineer
+Linux Engineer
+System Administrator
+QA Engineer
+Software Tester
+Automation Tester
+Manual Tester
+Test Engineer
+Quality Engineer
+Security Engineer
+Cyber Security Engineer
+Information Security Engineer
+Penetration Tester
+SOC Analyst
+Blue Team
+Red Team
+Security Analyst
+Game Developer
+Unity Developer
+Unreal Developer
+Gameplay Programmer
+Game Engineer
+Embedded Engineer
+Firmware Engineer
+IoT Engineer
+Hardware Engineer
+Robotics Engineer
+Data Platform Engineer
+ETL Developer
+Big Data Developer
+Spark Engineer
+Hadoop Engineer
+Airflow Engineer
+Product Manager
+Technical Product Manager
+Engineering Manager
+Tech Lead
+CTO
+VP Engineering
+Intern Developer
+Software Engineer Intern
+IT Intern
+Junior Software Engineer
+Fresher Developer
+Graduate Engineer
+Trainee Engineer
+-----------------------
+lệnh hoạt động
+npm run start-local
+lệnh kết nối mogodb
+npm run dev

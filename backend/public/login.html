@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px} .box{max-width:420px;margin:0 auto;background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}</style>
+</head>
+<body>
+  <div class="box">
+    <h3>Sign in</h3>
+    <div>
+      <label>Username<br><input id="username" type="text" /></label>
+    </div>
+    <div>
+      <label>Password<br><input id="password" type="password" /></label>
+    </div>
+    <div style="margin-top:12px">
+      <button id="login">Login</button>
+      <a href="/">Back</a>
+    </div>
+    <div id="msg" style="color:red;margin-top:8px"></div>
+  </div>
+  <script>
+    document.getElementById('login').addEventListener('click', async ()=>{
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: u, password: p }) });
+      const j = await res.json();
+      if(j.success && j.token){
+        localStorage.setItem('token', j.token);
+        window.location.href = '/';
+      } else {
+        document.getElementById('msg').innerText = j.error || 'Login failed';
+      }
+    });
+  </script>
+</body>
+</html>

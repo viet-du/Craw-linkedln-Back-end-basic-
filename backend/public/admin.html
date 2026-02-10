@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px} .box{max-width:800px;margin:0 auto;background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)} table{width:100%;border-collapse:collapse} td,th{padding:8px;border:1px solid #eee}</style>
+</head>
+<body>
+  <div class="box">
+    <h3>Admin - Users</h3>
+    <div>
+      <label>New username: <input id="newUser" /></label>
+      <label>Password: <input id="newPass" type="password" /></label>
+      <label>Role: <select id="newRole"><option value="user">user</option><option value="admin">admin</option></select></label>
+      <button id="create">Create</button>
+    </div>
+    <h4>Existing users</h4>
+    <table id="users"><thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Action</th></tr></thead><tbody></tbody></table>
+    <div style="margin-top:12px"><a href="/">Back</a></div>
+  </div>
+  <script>
+    async function api(url, opts={}){
+      opts.headers = Object.assign({}, opts.headers||{}, { Authorization: 'Bearer ' + localStorage.getItem('token') });
+      const r = await fetch(url, opts); return r.json();
+    }
+    async function load(){
+      const j = await api('/api/admin/users');
+      const tbody = document.querySelector('#users tbody'); tbody.innerHTML='';
+      if(!j.success) { tbody.innerHTML='<tr><td colspan="4">'+(j.error||'error')+'</td></tr>'; return; }
+      j.users.forEach(u=>{
+        const tr=document.createElement('tr'); tr.innerHTML = `<td>${u.username}</td><td>${u.role}</td><td>${new Date(u.createdAt).toLocaleString()}</td><td><button data-u='${u._id}'>Delete</button></td>`;
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('button[data-u]').forEach(b=>b.addEventListener('click', async e=>{
+        const id = e.target.getAttribute('data-u'); await api('/api/admin/users/'+id, { method:'DELETE' }); load();
+      }));
+    }
+    document.getElementById('create').addEventListener('click', async ()=>{
+      const u=document.getElementById('newUser').value.trim(); const p=document.getElementById('newPass').value; const r=document.getElementById('newRole').value;
+      await api('/api/admin/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p, role:r }) });
+      load();
+    });
+    load();
+  </script>
+</body>
+</html>

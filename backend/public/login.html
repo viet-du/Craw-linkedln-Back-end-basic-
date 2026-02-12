@@ -1,39 +1,525 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login</title>
-  <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px} .box{max-width:420px;margin:0 auto;background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login & Register | LinkedIn Candidates</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-container {
+            max-width: 480px;
+            width: 100%;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .auth-header {
+            background: linear-gradient(135deg, #4F81BD 0%, #2E5A8C 100%);
+            color: white;
+            padding: 30px 30px 25px;
+            text-align: center;
+        }
+
+        .auth-header h2 {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .auth-header p {
+            opacity: 0.9;
+            font-size: 0.95em;
+        }
+
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid #E5E7EB;
+            background: #F9FAFB;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 16px;
+            background: none;
+            border: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #6B7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #4F81BD;
+            border-bottom-color: #4F81BD;
+            background: white;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #F3F4F6;
+            color: #374151;
+        }
+
+        .auth-body {
+            padding: 30px;
+            background: white;
+        }
+
+        .form-container {
+            display: none;
+        }
+
+        .form-container.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95em;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4F81BD;
+            box-shadow: 0 0 0 3px rgba(79, 129, 189, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 8px;
+        }
+
+        .btn-primary {
+            background: #4F81BD;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2E5A8C;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(79, 129, 189, 0.3);
+        }
+
+        .btn-success {
+            background: #10B981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .msg {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.95em;
+            text-align: center;
+            display: none;
+        }
+
+        .msg.success {
+            background: #ECFDF5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
+            display: block;
+        }
+
+        .msg.error {
+            background: #FEF2F2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+            display: block;
+        }
+
+        .back-home {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #6B7280;
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: color 0.2s;
+        }
+
+        .back-home:hover {
+            color: #4F81BD;
+        }
+
+        .logged-in-section {
+            background: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .logged-in-section h3 {
+            font-size: 1.5em;
+            color: #1F2937;
+            margin-bottom: 16px;
+        }
+
+        .logged-in-section p {
+            color: #6B7280;
+            margin-bottom: 24px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid #4F81BD;
+            color: #4F81BD;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-outline:hover {
+            background: #4F81BD;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #DC2626;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-danger:hover {
+            background: #B91C1C;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 480px) {
+            .auth-header h2 { font-size: 1.8em; }
+            .auth-body { padding: 20px; }
+            .btn-group { flex-direction: column; }
+        }
+    </style>
 </head>
 <body>
-  <div class="box">
-    <h3>Sign in</h3>
-    <div>
-      <label>Username<br><input id="username" type="text" /></label>
+    <div class="auth-container" id="authContainer">
+        <!-- HEADER -->
+        <div class="auth-header">
+            <h2>LinkedIn Candidates</h2>
+            <p>Find the best talents with powerful analytics</p>
+        </div>
+
+        <!-- PHẦN HIỂN THỊ KHI CHƯA ĐĂNG NHẬP (LOGIN/REGISTER) -->
+        <div id="authForms">
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Login</button>
+                <button class="tab-btn" data-tab="register">Register</button>
+            </div>
+            <div class="auth-body">
+                <!-- LOGIN FORM -->
+                <div id="login-form" class="form-container active">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+                    </div>
+                    <button id="login-btn" class="btn btn-primary">Login</button>
+                    <div id="login-msg" class="msg"></div>
+                    <a href="/" class="back-home">← Back to Home</a>
+                </div>
+
+                <!-- REGISTER FORM -->
+                <div id="register-form" class="form-container">
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="reg-username" placeholder="3-30 characters, letters/numbers/_" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>Email (optional)</label>
+                        <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <input type="password" id="reg-password" placeholder="At least 8 characters" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password *</label>
+                        <input type="password" id="reg-confirm" placeholder="Re-enter password" autocomplete="off">
+                    </div>
+                    <button id="register-btn" class="btn btn-success">Create Account</button>
+                    <div id="register-msg" class="msg"></div>
+                    <a href="/" class="back-home">← Back to Home</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHẦN HIỂN THỊ KHI ĐÃ ĐĂNG NHẬP (ẨN FORM) -->
+        <div id="loggedInSection" style="display: none;">
+            <div class="logged-in-section">
+                <h3>👋 You're already logged in</h3>
+                <p id="loggedInUsername"></p>
+                <div class="btn-group">
+                    <a href="/dashboard.html" class="btn-outline">Go to Dashboard</a>
+                    <button id="logoutBtn" class="btn-danger">Logout</button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div>
-      <label>Password<br><input id="password" type="password" /></label>
-    </div>
-    <div style="margin-top:12px">
-      <button id="login">Login</button>
-      <a href="/">Back</a>
-    </div>
-    <div id="msg" style="color:red;margin-top:8px"></div>
-  </div>
-  <script>
-    document.getElementById('login').addEventListener('click', async ()=>{
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value;
-      const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: u, password: p }) });
-      const j = await res.json();
-      if(j.success && j.token){
-        localStorage.setItem('token', j.token);
-        window.location.href = '/';
-      } else {
-        document.getElementById('msg').innerText = j.error || 'Login failed';
-      }
-    });
-  </script>
+
+    <!-- Auth Interceptor (phải đặt trong thư mục public) -->
+    <script src="/authInterceptor.js"></script>
+
+    <script>
+        // --- KIỂM TRA TRẠNG THÁI ĐĂNG NHẬP KHI LOAD TRANG ---
+        (function checkAuth() {
+            const token = localStorage.getItem('token');
+            const authForms = document.getElementById('authForms');
+            const loggedInSection = document.getElementById('loggedInSection');
+            const loggedInUsername = document.getElementById('loggedInUsername');
+
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    loggedInUsername.textContent = `Logged in as ${payload.username} (${payload.role})`;
+                } catch (e) {
+                    loggedInUsername.textContent = 'Logged in';
+                }
+                authForms.style.display = 'none';
+                loggedInSection.style.display = 'block';
+            } else {
+                authForms.style.display = 'block';
+                loggedInSection.style.display = 'none';
+            }
+        })();
+
+        // --- TAB SWITCHING ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const formContainers = document.querySelectorAll('.form-container');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+                tabBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                formContainers.forEach(f => f.classList.remove('active'));
+                document.getElementById(`${tab}-form`).classList.add('active');
+                // Xoá thông báo cũ
+                document.getElementById('login-msg').style.display = 'none';
+                document.getElementById('register-msg').style.display = 'none';
+            });
+        });
+
+        // --- LOGIN HANDLER ---
+        document.getElementById('login-btn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const msgEl = document.getElementById('login-msg');
+
+            if (!username || !password) {
+                msgEl.textContent = 'Please enter both username and password';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+
+            msgEl.style.display = 'none';
+            this.disabled = true;
+            this.textContent = 'Logging in...';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('token', data.data.tokens.accessToken);
+                    localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+                    msgEl.textContent = 'Login successful! Redirecting...';
+                    msgEl.className = 'msg success';
+                    msgEl.style.display = 'block';
+                    setTimeout(() => window.location.href = '/dashboard.html', 1000);
+                } else {
+                    msgEl.textContent = data.error?.message || 'Login failed';
+                    msgEl.className = 'msg error';
+                    msgEl.style.display = 'block';
+                    this.disabled = false;
+                    this.textContent = 'Login';
+                }
+            } catch (err) {
+                msgEl.textContent = 'Network error. Please try again.';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                this.disabled = false;
+                this.textContent = 'Login';
+            }
+        });
+
+        // --- REGISTER HANDLER ---
+        document.getElementById('register-btn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
+            const msgEl = document.getElementById('register-msg');
+
+            // Validation
+            if (!username || !password || !confirm) {
+                msgEl.textContent = 'Username and password are required';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (username.length < 3 || username.length > 30) {
+                msgEl.textContent = 'Username must be 3-30 characters';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                msgEl.textContent = 'Username only letters, numbers, underscore';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (password.length < 8) {
+                msgEl.textContent = 'Password must be at least 8 characters';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (password !== confirm) {
+                msgEl.textContent = 'Passwords do not match';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+            if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+                msgEl.textContent = 'Invalid email format';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                return;
+            }
+
+            msgEl.style.display = 'none';
+            this.disabled = true;
+            this.textContent = 'Creating account...';
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, email: email || undefined })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    localStorage.setItem('token', data.data.tokens.accessToken);
+                    localStorage.setItem('refreshToken', data.data.tokens.refreshToken);
+                    msgEl.textContent = 'Registration successful! Redirecting...';
+                    msgEl.className = 'msg success';
+                    msgEl.style.display = 'block';
+                    setTimeout(() => window.location.href = '/dashboard.html', 1000);
+                } else {
+                    msgEl.textContent = data.error?.message || 'Registration failed';
+                    msgEl.className = 'msg error';
+                    msgEl.style.display = 'block';
+                    this.disabled = false;
+                    this.textContent = 'Create Account';
+                }
+            } catch (err) {
+                msgEl.textContent = 'Network error. Please try again.';
+                msgEl.className = 'msg error';
+                msgEl.style.display = 'block';
+                this.disabled = false;
+                this.textContent = 'Create Account';
+            }
+        });
+
+        // --- LOGOUT BUTTON (TRONG PHẦN ĐÃ ĐĂNG NHẬP) ---
+        document.addEventListener('click', async function(e) {
+            if (e.target.id === 'logoutBtn') {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    try {
+                        await authFetch('/api/auth/logout', { method: 'POST' });
+                    } catch (err) {}
+                }
+                localStorage.removeItem('token');
+                localStorage.removeItem('refreshToken');
+                window.location.reload();
+            }
+        });
+
+        // --- ALLOW ENTER KEY SUBMIT ---
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+                if (activeTab === 'login') {
+                    document.getElementById('login-btn').click();
+                } else {
+                    document.getElementById('register-btn').click();
+                }
+            }
+        });
+    </script>
 </body>
 </html>

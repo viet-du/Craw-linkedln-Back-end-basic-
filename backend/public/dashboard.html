@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - LinkedIn Candidates</title>
+    <style>
+        /* ===== GIỮ NGUYÊN STYLE CŨ ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #4F81BD 0%, #2E5A8C 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .header h1 { font-size: 1.8em; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4F81BD;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            background: #4F81BD;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { background: #2E5A8C; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .candidate-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-height: 700px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .candidate-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .candidate-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+            border-color: #4F81BD;
+        }
+        .candidate-card h3 { margin-bottom: 8px; color: #333; }
+        .candidate-card p { margin: 5px 0; color: #666; }
+        .skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .skill-tag {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 0.85em;
+        }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .error {
+            background: #ffe6e6;
+            color: #cc0000;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        /* ===== MODAL STYLES ===== */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            position: relative;
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            animation: modalFadeIn 0.3s;
+        }
+        @keyframes modalFadeIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid #E5E7EB;
+            background: linear-gradient(135deg, #4F81BD 0%, #2E5A8C 100%);
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.6em;
+            color: white;
+        }
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .modal-close:hover { opacity: 1; }
+        .modal-body { padding: 24px; }
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #E5E7EB;
+            text-align: right;
+            background: #F9FAFB;
+            border-radius: 0 0 16px 16px;
+        }
+        .detail-section { margin-bottom: 24px; }
+        .detail-section h4 {
+            font-size: 1.2em;
+            color: #1F2937;
+            border-bottom: 2px solid #4F81BD;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 12px;
+        }
+        .detail-label {
+            width: 140px;
+            font-weight: 600;
+            color: #4B5563;
+        }
+        .detail-value {
+            flex: 1;
+            color: #1F2937;
+        }
+        .skill-tag-lg {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            padding: 6px 14px;
+            border-radius: 24px;
+            font-size: 0.95em;
+            display: inline-block;
+            margin: 0 6px 8px 0;
+        }
+        .exp-item, .edu-item {
+            background: #F9FAFB;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #E5E7EB;
+        }
+        .exp-item strong, .edu-item strong { color: #1F2937; }
+
+        /* ===== STYLE CHO PHẦN ANALYTICS ===== */
+        .analytics-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #E5E7EB;
+        }
+        .analytics-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .chart-wrapper {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            position: relative;
+        }
+        .distribution-list {
+            flex: 1;
+            min-width: 250px;
+        }
+        .distribution-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .distribution-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .color-box {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header { flex-direction: column; text-align: center; gap: 10px; }
+            .detail-row { flex-direction: column; }
+            .detail-label { width: 100%; margin-bottom: 4px; }
+            .analytics-container { flex-direction: column; }
+            .chart-wrapper { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Dashboard</h1>
+        <div class="user-info">
+            <span id="username">Loading...</span>
+            <a href="/" class="btn">Home</a>
+            <button onclick="window.logout ? window.logout() : logout()" class="btn btn-danger">Logout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="actions">
+            <a href="/" class="btn">Back to Home</a>
+            <a href="/admin.html" class="btn" id="adminBtn" style="display: none;">Admin Panel</a>
+        </div>
+        
+        <!-- Thống kê nhanh -->
+        <div id="stats" class="stats-grid"></div>
+        
+        <!-- PHẦN PHÂN TÍCH BIỂU ĐỒ TRÒN -->
+        <div class="analytics-section">
+            <h3>📊 Phân tích theo ngành nghề (Top 8)</h3>
+            <div class="analytics-container">
+                <div class="chart-wrapper">
+                    <canvas id="jobTitleChart"></canvas>
+                </div>
+                <div id="distributionList" class="distribution-list">
+                    <h4>Top Job Titles</h4>
+                    <div class="loading">Đang tải dữ liệu...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Danh sách ứng viên -->
+        <div class="content">
+            <h2 id="candidatesTitle">All Candidates</h2>
+            <div id="candidatesList" class="candidate-grid">
+                <div class="loading">Loading candidates...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XEM CHI TIẾT ỨNG VIÊN -->
+    <div id="candidateModal" class="modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-name"></h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/authInterceptor.js"></script>
+    <!-- ✅ CHART.JS LOCAL – ĐẢM BẢO 100% HOẠT ĐỘNG -->
+    <script src="/js/chart.umd.min.js"></script>
+    <script>
+        // ========== BIẾN TOÀN CỤC ==========
+        let currentCandidates = [];
+        let jobTitleChart = null;
+
+        // ========== KIỂM TRA TOKEN ==========
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/login.html';
+
+        let user = null;
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            user = payload;
+            document.getElementById('username').textContent = user.username;
+            if (user.role === 'admin') {
+                document.getElementById('adminBtn').style.display = 'inline-block';
+            }
+        } catch (e) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/login.html';
+        }
+
+        // ========== LOGOUT ==========
+        async function logout() {
+            const token = localStorage.getItem('token');
+            const refreshToken = localStorage.getItem('refreshToken');
+            if (token) {
+                try {
+                    await authFetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refreshToken })
+                    });
+                } catch (error) {}
+            }
+            localStorage.removeItem('token');
+            localStorage.removeItem('refreshToken');
+            window.location.href = '/';
+        }
+
+        // ========== LOAD DỮ LIỆU DASHBOARD ==========
+        async function loadDashboardData() {
+            // 1. Thống kê
+            try {
+                const statsRes = await authFetch('/api/statistics');
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    if (statsData.success) displayStats(statsData.data);
+                } else {
+                    displayStatsFallback();
+                }
+            } catch (e) {
+                console.warn('Statistics endpoint error, using fallback', e);
+                displayStatsFallback();
+            }
+
+            // 2. Danh sách ứng viên
+            try {
+                const candidatesRes = await authFetch('/api/candidates?limit=1000');
+                if (candidatesRes.ok) {
+                    const candidatesData = await candidatesRes.json();
+                    if (candidatesData.success) displayCandidates(candidatesData.data);
+                } else {
+                    document.getElementById('candidatesList').innerHTML = '<div class="error">Không thể tải danh sách ứng viên.</div>';
+                }
+            } catch (e) {
+                console.error('Error loading candidates:', e);
+                document.getElementById('candidatesList').innerHTML = '<div class="error">Lỗi kết nối, vui lòng thử lại.</div>';
+            }
+
+            // 3. Biểu đồ
+            await loadDistribution('job_title');
+        }
+
+        function displayStatsFallback() {
+            displayStats({
+                totalCandidates: 0,
+                avgExperience: 0,
+                avgScore: 0,
+                avgQuality: 0
+            });
+        }
+
+        function displayStats(stats) {
+            const container = document.getElementById('stats');
+            container.innerHTML = '';
+            const cards = [
+                { label: 'Total Candidates', value: stats.totalCandidates || 0 },
+                { label: 'Avg Experience', value: stats.avgExperience ? Math.round(stats.avgExperience * 10) / 10 : 0 },
+                { label: 'Avg Score', value: stats.avgScore ? Math.round(stats.avgScore * 10) / 10 : 0 },
+                { label: 'Avg Quality', value: stats.avgQuality ? Math.round(stats.avgQuality * 10) / 10 : 0 }
+            ];
+            cards.forEach(card => {
+                const div = document.createElement('div');
+                div.className = 'stat-card';
+                div.innerHTML = `<div class="stat-value">${card.value}</div><div class="stat-label">${card.label}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function displayCandidates(candidates) {
+            currentCandidates = candidates;
+            const container = document.getElementById('candidatesList');
+            const titleEl = document.getElementById('candidatesTitle');
+            
+            if (!candidates || candidates.length === 0) {
+                container.innerHTML = '<p>No candidates found.</p>';
+                titleEl.textContent = 'No Candidates';
+                return;
+            }
+
+            titleEl.textContent = `All Candidates (${candidates.length} total)`;
+
+            let html = '';
+            candidates.forEach(c => {
+                html += `
+                    <div class="candidate-card" onclick="viewCandidate('${c._id}')">
+                        <h3>${c.name || 'N/A'}</h3>
+                        <p><strong>${c.job_title || 'No title'}</strong></p>
+                        <p>📍 ${c.location || 'Unknown'}</p>
+                        <p>⭐ Score: ${c.score || 0} | 📅 Exp: ${c.total_experience_count || 0} years</p>
+                        <div class="skills">
+                            ${(c.skills || []).slice(0, 4).map(s => `<span class="skill-tag">${s}</span>`).join('')}
+                            ${(c.skills || []).length > 4 ? '<span class="skill-tag">+ more</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ========== LOAD DỮ LIỆU PHÂN BỐ ==========
+        async function loadDistribution(type = 'job_title') {
+            try {
+                console.log('🔄 Loading distribution for', type);
+                const res = await authFetch(`/api/candidates/statistics/distributions?type=${type}&limit=8`);
+                console.log('📡 Distribution response status:', res.status);
+                
+                if (!res.ok) {
+                    if (res.status === 404) {
+                        throw new Error('Endpoint /api/candidates/statistics/distributions không tồn tại. Vui lòng kiểm tra backend.');
+                    }
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                
+                const data = await res.json();
+                console.log('📊 Distribution data:', data);
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    renderDistributionList(data.data);
+                    // ✅ CHART.JS ĐÃ ĐƯỢC TẢI LOCAL, GỌI TRỰC TIẾP
+                    renderPieChart(data.data);
+                } else {
+                    document.getElementById('distributionList').innerHTML = '<p class="error">📭 Không có dữ liệu để hiển thị. Hãy import ứng viên trước.</p>';
+                }
+            } catch (error) {
+                console.error('❌ Error loading distribution:', error);
+                document.getElementById('distributionList').innerHTML = `<p class="error">❌ ${error.message}</p>`;
+            }
+        }
+
+        // ========== VẼ BIỂU ĐỒ TRÒN ==========
+        function renderPieChart(distribution) {
+            const canvas = document.getElementById('jobTitleChart');
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                return;
+            }
+            const ctx = canvas.getContext('2d');
+            
+            if (jobTitleChart) {
+                jobTitleChart.destroy();
+                jobTitleChart = null;
+            }
+
+            const labels = distribution.map(d => d.label);
+            const counts = distribution.map(d => d.count);
+            const percentages = distribution.map(d => d.percentage);
+
+            const colors = [
+                '#4F81BD', '#2E5A8C', '#10B981', '#F59E0B',
+                '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'
+            ];
+
+            try {
+                jobTitleChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: counts,
+                            backgroundColor: colors.slice(0, labels.length),
+                            borderWidth: 1,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { boxWidth: 12, padding: 10, font: { size: 11 } }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const label = context.label || '';
+                                        const value = context.raw || 0;
+                                        const percentage = percentages[context.dataIndex];
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('✅ Pie chart rendered successfully');
+            } catch (error) {
+                console.error('❌ Failed to create chart:', error);
+                document.getElementById('distributionList').innerHTML += '<p class="error">❌ Lỗi khởi tạo biểu đồ. Kiểm tra file Chart.js local.</p>';
+            }
+        }
+
+        // ========== HIỂN THỊ DANH SÁCH PHÂN BỐ ==========
+        function renderDistributionList(distribution) {
+            const container = document.getElementById('distributionList');
+            if (!distribution || distribution.length === 0) {
+                container.innerHTML = '<p>Không có dữ liệu.</p>';
+                return;
+            }
+
+            const colors = [
+                '#4F81BD', '#2E5A8C', '#10B981', '#F59E0B',
+                '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'
+            ];
+
+            let html = '<h4>Top Job Titles</h4><ul>';
+            distribution.forEach((item, index) => {
+                html += `<li>
+                            <span class="color-box" style="background: ${colors[index % colors.length]};"></span>
+                            <span><strong>${item.label}</strong>: ${item.count} (${item.percentage}%)</span>
+                        </li>`;
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // ========== XEM CHI TIẾT ỨNG VIÊN ==========
+        function viewCandidate(candidateId) {
+            const candidate = currentCandidates.find(c => c._id === candidateId);
+            if (!candidate) {
+                alert('Candidate not found!');
+                return;
+            }
+
+            document.getElementById('modal-name').textContent = candidate.name || 'Unknown';
+
+            const skillsHtml = (candidate.skills || []).length > 0
+                ? (candidate.skills || []).map(s => `<span class="skill-tag-lg">${s}</span>`).join('')
+                : '<p>No skills listed.</p>';
+
+            let educationHtml = '';
+            if (candidate.education && candidate.education.length > 0) {
+                educationHtml = candidate.education.map(edu => `
+                    <div class="edu-item">
+                        <strong>${edu.school || 'Unknown school'}</strong><br>
+                        ${edu.degree || ''} <span style="color:#6B7280;">(${edu.degree_level || 'Other'})</span><br>
+                        <span style="color:#6B7280;">${edu.duration || ''}</span>
+                    </div>
+                `).join('');
+            } else {
+                educationHtml = '<p>No education information.</p>';
+            }
+
+            let experienceHtml = '';
+            if (candidate.experience && candidate.experience.length > 0) {
+                experienceHtml = candidate.experience.map(exp => `
+                    <div class="exp-item">
+                        <strong>${exp.position || 'Position'}</strong> at <strong>${exp.company || 'Company'}</strong><br>
+                        <span style="color:#6B7280;">${exp.employment_type || ''} · ${exp.duration || ''}</span><br>
+                        ${exp.duration_months ? `<span style="color:#6B7280;">Duration: ${exp.duration_months} months</span>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                experienceHtml = '<p>No experience information.</p>';
+            }
+
+            const basicInfoHtml = `
+                <div class="detail-section">
+                    <h4>📋 Basic Information</h4>
+                    <div class="detail-row"><span class="detail-label">Job Title:</span><span class="detail-value">${candidate.job_title || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Location:</span><span class="detail-value">${candidate.location || 'N/A'}</span></div>
+                    <div class="detail-row"><span class="detail-label">Total Experience:</span><span class="detail-value">${candidate.total_experience_count || 0} years</span></div>
+                    <div class="detail-row"><span class="detail-label">LinkedIn:</span><span class="detail-value"><a href="${candidate.linkedin_url || '#'}" target="_blank">${candidate.linkedin_url || 'N/A'}</a></span></div>
+                    <div class="detail-row"><span class="detail-label">Score:</span><span class="detail-value"><span style="background:#4F81BD; color:white; padding:4px 12px; border-radius:20px;">${candidate.score || 0}</span></span></div>
+                    <div class="detail-row"><span class="detail-label">Quality Score:</span><span class="detail-value"><span style="background:#10B981; color:white; padding:4px 12px; border-radius:20px;">${candidate.data_quality_score || 0}</span></span></div>
+                </div>
+            `;
+
+            const modalBody = `
+                ${basicInfoHtml}
+                <div class="detail-section">
+                    <h4>🛠️ Skills</h4>
+                    <div>${skillsHtml}</div>
+                </div>
+                <div class="detail-section">
+                    <h4>🎓 Education</h4>
+                    ${educationHtml}
+                </div>
+                <div class="detail-section">
+                    <h4>💼 Experience</h4>
+                    ${experienceHtml}
+                </div>
+            `;
+
+            document.getElementById('modal-body').innerHTML = modalBody;
+            document.getElementById('candidateModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('candidateModal').style.display = 'none';
+        }
+
+        // ========== KHỞI TẠO ==========
+        document.addEventListener('DOMContentLoaded', loadDashboardData);
+    </script>
+</body>
+</html>

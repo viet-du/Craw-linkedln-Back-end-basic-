@@ -3,229 +3,225 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 
+// ---------- 1. KHỞI TẠO APP ----------
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ---------- 2. MIDDLEWARE CƠ BẢN ----------
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
 
-// Kết nối MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('✅ Connected to MongoDB');
-  
-  // Kiểm tra số lượng documents
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://yourdomain.com']
+    : ['http://localhost:3000'],
+  credentials: true,
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(mongoSanitize());
+
+// ---------- 3. STATIC FILES ----------
+app.use('/data', express.static(path.join(__dirname, '../data')));
+app.use('/uploads', express.static('uploads'));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------- 4. IMPORT CÁC MODULE NỘI BỘ (SAU KHI APP ĐÃ TỒN TẠI) ----------
+const { logger, requestLogger } = require('./src/utils/logger');
+const { errorHandler, asyncErrorHandler } = require('./src/middleware/errorHandler');
+const { connectRedis } = require('./src/utils/redisClient');
+const { authenticateToken } = require('./src/middleware/auth');
+
+// ---------- 5. IMPORT ROUTES ----------
+const authRoutes = require('./src/routes/auth');
+const candidateRoutes = require('./src/routes/candidates');
+const adminRoutes = require('./src/routes/admin');
+const exportRoutes = require('./src/routes/export');
+
+// ---------- 6. REQUEST LOGGER ----------
+app.use(requestLogger);
+
+// ---------- 7. GẮN ROUTES ----------
+app.use('/api/auth', authRoutes);
+app.use('/api/candidates', candidateRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/export', exportRoutes);
+
+// ---------- 8. ENDPOINT THỐNG KÊ CHO DASHBOARD ----------
+app.get('/api/statistics', authenticateToken, asyncErrorHandler(async (req, res) => {
   const Candidate = require('./src/models/Candidate');
-  Candidate.countDocuments()
-    .then(count => {
-      console.log(`📊 Total candidates in database: ${count}`);
-    });
-})
-.catch(err => {
-  console.error('❌ MongoDB connection error:', err);
-});
+  const totalCandidates = await Candidate.countDocuments();
+  const avgExperience = await Candidate.aggregate([
+    { $group: { _id: null, avg: { $avg: '$total_experience_count' } } },
+  ]);
+  const avgScore = await Candidate.aggregate([
+    { $group: { _id: null, avg: { $avg: '$score' } } },
+  ]);
+  const avgQuality = await Candidate.aggregate([
+    { $group: { _id: null, avg: { $avg: '$data_quality_score' } } },
+  ]);
 
-// Routes đơn giản
-const Candidate = require('./src/models/Candidate');
-
-// API: Lấy tất cả candidates
-app.get('/api/candidates', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-    
-    const candidates = await Candidate.find()
-      .sort({ score: -1 })
-      .skip(skip)
-      .limit(limit);
-    
-    const total = await Candidate.countDocuments();
-    
-    res.json({
-      success: true,
-      data: candidates,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API: Tìm kiếm candidates
-app.get('/api/candidates/search', async (req, res) => {
-  try {
-    const query = req.query.q;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-    
-    let searchQuery = {};
-    
-    if (query) {
-      searchQuery = {
-        $or: [
-          { name: { $regex: query, $options: 'i' } },
-          { job_title: { $regex: query, $options: 'i' } },
-          { location: { $regex: query, $options: 'i' } },
-          { skills: { $in: [new RegExp(query, 'i')] } }
-        ]
-      };
-    }
-    
-    const candidates = await Candidate.find(searchQuery)
-      .sort({ score: -1 })
-      .skip(skip)
-      .limit(limit);
-    
-    const total = await Candidate.countDocuments(searchQuery);
-    
-    res.json({
-      success: true,
-      data: candidates,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API: Top candidates theo kinh nghiệm
-app.get('/api/candidates/top/experience', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    
-    const candidates = await Candidate.find()
-      .sort({ total_experience_count: -1, score: -1 })
-      .limit(limit);
-    
-    res.json({
-      success: true,
-      data: candidates
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API: Top candidates theo học vấn
-app.get('/api/candidates/top/education', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    
-    const candidates = await Candidate.find({
-      'education.degree_level': { $in: ['PhD', 'Master', 'MBA'] }
-    })
-    .sort({ score: -1 })
-    .limit(limit);
-    
-    res.json({
-      success: true,
-      data: candidates
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API: Thống kê
-app.get('/api/statistics', async (req, res) => {
-  try {
-    const Candidate = require('./src/models/Candidate');
-    
-    const totalCandidates = await Candidate.countDocuments();
-    const avgExperience = await Candidate.aggregate([
-      { $group: { _id: null, avg: { $avg: '$total_experience_count' } } }
-    ]);
-    const avgScore = await Candidate.aggregate([
-      { $group: { _id: null, avg: { $avg: '$score' } } }
-    ]);
-    
-    // Top skills
-    const topSkills = await Candidate.aggregate([
-      { $unwind: '$skills' },
-      { $group: { _id: '$skills', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 }
-    ]);
-    
-    // Top locations
-    const topLocations = await Candidate.aggregate([
-      { $match: { location: { $ne: null, $ne: '' } } },
-      { $group: { _id: '$location', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 }
-    ]);
-    
-    // Education distribution
-    const educationStats = await Candidate.aggregate([
-      { $unwind: '$education' },
-      { $group: { 
-        _id: '$education.degree_level', 
-        count: { $sum: 1 },
-        avgScore: { $avg: '$score' }
-      } },
-      { $sort: { count: -1 } }
-    ]);
-    
-    res.json({
-      success: true,
-      data: {
-        totalCandidates,
-        avgExperience: avgExperience[0]?.avg || 0,
-        avgScore: avgScore[0]?.avg || 0,
-        topSkills,
-        topLocations,
-        educationStats
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// API: Health check
-app.get('/health', async (req, res) => {
-  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  const Candidate = require('./src/models/Candidate');
-  const count = await Candidate.countDocuments();
-  
   res.json({
-    status: 'OK',
-    mongodb: mongoStatus,
-    candidatesCount: count,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
+    success: true,
+    data: {
+      totalCandidates,
+      avgExperience: avgExperience[0]?.avg || 0,
+      avgScore: avgScore[0]?.avg || 0,
+      avgQuality: avgQuality[0]?.avg || 0,
+    },
+  });
+}));
+
+// ---------- 9. HEALTH CHECK ----------
+app.get('/health', async (req, res) => {
+  try {
+    const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    const Candidate = require('./src/models/Candidate');
+    const count = await Candidate.countDocuments();
+
+    const redis = require('./src/utils/redisClient');
+    let redisStatus = 'disconnected';
+    try {
+      const redisClient = redis.client;
+      if (redisClient && redisClient.isOpen) {
+        await redisClient.ping();
+        redisStatus = 'connected';
+      }
+    } catch (redisErr) {
+      logger.error('Redis health check failed:', redisErr);
+    }
+
+    res.json({
+      status: 'OK',
+      services: { mongodb: mongoStatus, redis: redisStatus, uptime: process.uptime() },
+      data: { candidatesCount: count, lastUpdated: new Date().toISOString() },
+    });
+  } catch (error) {
+    logger.error('Health check error:', error);
+    res.status(500).json({ status: 'ERROR', error: error.message });
+  }
+});
+
+// ---------- 10. WELCOME PAGE & API DOCS ----------
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api-docs', (req, res) => {
+  res.json({
+    name: 'LinkedIn Candidates API',
+    version: '1.0.0',
+    endpoints: { /* ... bạn có thể giữ nguyên hoặc bỏ qua */ },
   });
 });
 
-// Serve static files
-app.use('/data', express.static(path.join(__dirname, '../data')));
-app.use('/uploads', express.static('uploads'));
+// ---------- 11. ERROR HANDLER ----------
+app.use(errorHandler);
 
-// Khởi động server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`👨‍💼 Candidates API: http://localhost:${PORT}/api/candidates`);
-  console.log(`🔍 Search API: http://localhost:${PORT}/api/candidates/search?q=keyword`);
-  console.log(`🥇 Top by experience: http://localhost:${PORT}/api/candidates/top/experience`);
-  console.log(`🎓 Top by education: http://localhost:${PORT}/api/candidates/top/education`);
-  console.log(`📈 Statistics: http://localhost:${PORT}/api/statistics`);
-});
+// ---------- 12. KẾT NỐI DATABASE VÀ START SERVER ----------
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  })
+  .then(async () => {
+    logger.info('✅ Connected to MongoDB');
+
+    await connectRedis();
+
+    await initializeAdminUser();
+
+    const Candidate = require('./src/models/Candidate');
+    const count = await Candidate.countDocuments();
+    logger.info(`📊 Total candidates in database: ${count}`);
+
+    const PORT = process.env.PORT || 3001;
+    const server = app.listen(PORT, () => {
+      logger.info(`🚀 Server running on http://localhost:${PORT}`);
+      logger.info(`📊 Health check: http://localhost:${PORT}/health`);
+      logger.info(`📚 API Docs: http://localhost:${PORT}/api-docs`);
+    });
+
+    setupGracefulShutdown(server);
+  })
+  .catch((err) => {
+    logger.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });
+
+async function initializeAdminUser() {
+  try {
+    const User = require('./src/models/User');
+    const bcrypt = require('bcryptjs');
+
+    const adminExists = await User.findOne({ username: process.env.ADMIN_USERNAME || 'admin' });
+
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin123', 12);
+      const adminUser = new User({
+        username: process.env.ADMIN_USERNAME || 'admin',
+        passwordHash: hashedPassword,
+        role: 'admin',
+        isActive: true,
+        email: process.env.ADMIN_EMAIL || 'admin@example.com',
+      });
+      await adminUser.save();
+      logger.info('👑 Admin user created successfully');
+    } else {
+      logger.info('👑 Admin user already exists');
+    }
+  } catch (error) {
+    logger.error('Failed to initialize admin user:', error);
+  }
+}
+
+function setupGracefulShutdown(server) {
+  const shutdown = async (signal) => {
+    logger.info(`${signal} received. Starting graceful shutdown...`);
+
+    server.close(async () => {
+      logger.info('HTTP server closed');
+
+      try {
+        await mongoose.connection.close();
+        logger.info('MongoDB connection closed');
+      } catch (err) {
+        logger.error('Error closing MongoDB connection:', err);
+      }
+
+      try {
+        const { client } = require('./src/utils/redisClient');
+        if (client && client.isOpen) {
+          await client.quit();
+          logger.info('Redis connection closed');
+        }
+      } catch (err) {
+        logger.error('Error closing Redis connection:', err);
+      }
+
+      logger.info('Graceful shutdown completed');
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}

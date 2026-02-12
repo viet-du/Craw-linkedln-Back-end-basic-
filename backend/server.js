@@ -16,6 +16,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'self'", "'unsafe-inline'"], // ✅ CHO PHÉP INLINE EVENT HANDLER (onclick...)
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
@@ -122,7 +123,50 @@ app.get('/api-docs', (req, res) => {
   res.json({
     name: 'LinkedIn Candidates API',
     version: '1.0.0',
-    endpoints: { /* ... bạn có thể giữ nguyên hoặc bỏ qua */ },
+    endpoints: {
+      auth: {
+        login: 'POST /api/auth/login',
+        register: 'POST /api/auth/register',
+        refresh: 'POST /api/auth/refresh',
+        logout: 'POST /api/auth/logout',
+        me: 'GET /api/auth/me',
+      },
+      candidates: {
+        list: 'GET /api/candidates',
+        search: 'GET /api/candidates/search?q=keyword',
+        advanced: 'GET /api/candidates/advanced-search',
+        topByExperience: 'GET /api/candidates/top/experience',
+        topByEducation: 'GET /api/candidates/top/education',
+        statistics: 'GET /api/candidates/statistics/summary',
+        distributions: 'GET /api/candidates/statistics/distributions?type=...',
+        getById: 'GET /api/candidates/:id',
+        create: 'POST /api/candidates',
+        update: 'PUT /api/candidates/:id',
+        delete: 'DELETE /api/candidates/:id',
+        validate: 'POST /api/candidates/validate',
+        batchValidate: 'POST /api/candidates/batch-validate',
+      },
+      admin: {
+        users: 'GET /api/admin/users',
+        createUser: 'POST /api/admin/users',
+        updateUser: 'PUT /api/admin/users/:id',
+        deleteUser: 'DELETE /api/admin/users/:id',
+        import: 'POST /api/admin/import',
+        batchDelete: 'DELETE /api/admin/batch',
+        batchUpdate: 'PATCH /api/admin/batch',
+        export: 'GET /api/admin/export',
+        statistics: 'GET /api/admin/statistics',
+        clearCache: 'POST /api/admin/clear-cache',
+        dataQualityReport: 'GET /api/admin/data-quality-report',
+      },
+      export: {
+        csv: 'GET /api/export/csv',
+        excel: 'GET /api/export/excel',
+        json: 'GET /api/export/json',
+        withPhotos: 'GET /api/export/with-photos',
+        bulk: 'GET /api/export/bulk',
+      },
+    },
   });
 });
 
@@ -148,7 +192,7 @@ mongoose
     const count = await Candidate.countDocuments();
     logger.info(`📊 Total candidates in database: ${count}`);
 
-    const PORT = process.env.PORT || 3001;
+    const PORT = process.env.PORT || 3000; // 👈 ĐỔI LẠI THÀNH 3000
     const server = app.listen(PORT, () => {
       logger.info(`🚀 Server running on http://localhost:${PORT}`);
       logger.info(`📊 Health check: http://localhost:${PORT}/health`);

@@ -1608,7 +1608,7 @@ Indexes:
 
 **Tác giả:** Dư Quốc Việt
 
-**Email:** [your-email@example.com]
+**Email:** [Duviet720@gmail.com]
 
 **GitHub:** [repository](https://github.com/viet-du/Craw-linkedln-Back-end-basic-)
 

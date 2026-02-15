@@ -10,6 +10,24 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import random
 import os
+#Thêm kafka
+from kafka import KafkaProducer
+#Thêm thoát craw đa thread
+import signal
+import sys
+#Thêm threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from selenium.common.exceptions import TimeoutException
+
+stop_flag = False
+
+def signal_handler(sig, frame):
+    global stop_flag
+    print("\n🛑 Đang dừng an toàn... Vui lòng chờ hoàn tất profile hiện tại...")
+    stop_flag = True
+
+signal.signal(signal.SIGINT, signal_handler)
 
 # Tăng thời gian timeout
 WAIT_TIMEOUT = 30
@@ -27,7 +45,7 @@ print('- Finish initializing a driver')
 sleep(2)
 
 # Task 1.2: Import username and password
-credential_path = r"D:\Hoc_tap\linkedlin\function\login.txt"
+credential_path = r"D:\Hoc_tap\linkedlin\scraper\login.txt"
 try:
     with open(credential_path, "r", encoding="utf-8") as credential:
         lines = credential.read().splitlines()
@@ -62,12 +80,27 @@ try:
     sleep(60)
     
     print('- Finish Task 1: Login to Linkedin')
+    #lưu cookie cho các threading sau
+    cookies = driver.get_cookies()
+    # ===== KAFKA CONFIG =====
+    KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
+    KAFKA_TOPIC = "linkedin-profiles"
+
+    producer = KafkaProducer(
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
+        retries=5,
+        acks='all'
+    )
+
+    print("✅ Kafka Producer đã khởi tạo")
+
 except Exception as e:
     print(f"Lỗi đăng nhập: {e}")
 
 # Task 2: Search for the profile we want to crawl + button people
 print("\n=== Bắt đầu tìm kiếm profiles ===")
-profiles_path = r"D:\Hoc_tap\linkedlin\function\profiles.txt"
+profiles_path = r"D:\Hoc_tap\linkedlin\scraper\profiles.txt"
 try:
     with open(profiles_path, "r", encoding="utf-8") as f:
         profiles = [line.strip() for line in f if line.strip()]
@@ -79,62 +112,57 @@ for profile in profiles:
     print(f"Đang tìm kiếm: {profile}")
     
     try:
-        # Tìm ô tìm kiếm
         search_field = WebDriverWait(driver, WAIT_TIMEOUT).until(
             EC.element_to_be_clickable(
-                (By.XPATH, "//input[contains(@placeholder,'Tìm kiếm') or contains(@placeholder,'Search')]")
+                (By.CSS_SELECTOR, "input[data-testid='typeahead-input']")
             )
         )
-        
-        # Xóa và nhập từ khóa
+
+        search_field.click()
+        time.sleep(1)
+
         search_field.clear()
         search_field.send_keys(profile)
         search_field.send_keys(Keys.ENTER)
-        print(f"  Đã tìm kiếm: {profile}")
+
+        print(f"  ✅ Đã tìm kiếm: {profile}")
         time.sleep(5)
+
+    except Exception as e:
+        print(f"  ❌ Không tìm được ô search: {e}")
         
-        # TÌM VÀ NHẤN NÚT "NGƯỜI"
+        # Dừng lại để bạn có thể tự nhấn nút 'Người' nếu muốn
+        print("  Nếu bạn muốn lọc 'Người', vui lòng nhấn tab 'Người' trên trình duyệt ngay bây giờ.")
+        print("  Khi đã sẵn sàng, quay về terminal và nhấn Enter để tiếp tục (hoặc nhấn Enter ngay lập tức để bỏ qua).")
         try:
-            people_button = WebDriverWait(driver, WAIT_TIMEOUT).until(
-                EC.element_to_be_clickable((
-                    By.XPATH,
-                    "//button[contains(@aria-label, 'Người') or contains(@aria-label, 'People') or contains(text(),'Người') or contains(text(),'People')]"
-                ))
-            )
-            people_button.click()
-            print("  Đã nhấn nút Người bằng text")
-        except:
-            try:
-                people_button = driver.find_element(By.XPATH, "//button[@aria-label='Hiển thị kết quả cho Người']")
-                people_button.click()
-                print("  Đã nhấn nút Người bằng aria-label")
-            except:
-                buttons = driver.find_elements(By.TAG_NAME, "button")
-                for btn in buttons:
-                    text = btn.text.lower()
-                    if 'người' in text or 'people' in text:
-                        btn.click()
-                        print("  Đã nhấn nút Người bằng lọc button")
-                        break
-        
-        time.sleep(5)
-        
-        # Scroll để load thêm profiles
+            input("  Nhấn Enter để tiếp tục...")
+        except Exception:
+            # Trong một số môi trường không hỗ trợ input(), tiếp tục ngay
+            pass
+
+        # Scroll để load profiles
         for i in range(3):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)
-        
+
         # Lấy và hiển thị một số profiles để kiểm tra
         page_source = driver.page_source
         soup = BeautifulSoup(page_source, "html.parser")
-        
+
         profile_cards = soup.find_all("div", {"class": ["search-result", "reusable-search__result-container", "entity-result"]})
         print(f"  Tìm thấy {len(profile_cards)} profile cards")
-        
+
+        if len(profile_cards) == 0:
+            print("  ⚠️ Cảnh báo: Không tìm thấy profile cards nào!")
+            print("  Đang thử tìm profiles bằng cách khác...")
+            profile_links = soup.find_all("a", href=lambda x: x and "/in/" in x)
+            print(f"  Tìm thấy {len(profile_links)} link profiles trực tiếp")
+
         time.sleep(3)
         
     except Exception as e:
         print(f"  Lỗi khi tìm kiếm {profile}: {e}")
+        print("  Tiếp tục với profile tiếp theo...")
         continue
 
 print("\n=== Hoàn thành Task 2: Tìm kiếm profiles ===")
@@ -288,29 +316,56 @@ for i, url in enumerate(URLs_all_page[:5]):
     print(f"  {i+1}. {url}")
 
 
-
-# Task 4: Scrape the data của từng profile
-print("\n=== Bắt đầu thu thập dữ liệu từng profile ===")
-
-profiles_data = []
-total_profiles = len(URLs_all_page)
-
-for idx, linkedin_URL in enumerate(URLs_all_page, 1):
-    print(f"\n[{idx}/{total_profiles}] Đang xử lý: {linkedin_URL}")
+def crawl_profile(linkedin_URL, idx, total_profiles):
+    global stop_flag
     
+    if stop_flag:
+        return None
+    options = webdriver.ChromeOptions()
+
+# Headless mode
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-gpu")
+
+    # Giả lập kích thước window ổn định
+    options.add_argument("--window-size=1280,900")
+    #Giảm bị detect automation.
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+
+
+    thread_driver = webdriver.Chrome(options=options)
+
+
+
+    # Gắn lại cookies để khỏi login lại
+    thread_driver.get("https://www.linkedin.com")
+    for cookie in cookies:
+        thread_driver.add_cookie(cookie)
+
     try:
-        driver.get(linkedin_URL)
-        WebDriverWait(driver, WAIT_TIMEOUT).until(
+        print(f"\n[{idx}/{total_profiles}] Đang xử lý: {linkedin_URL}")
+
+        thread_driver.set_page_load_timeout(60)
+        thread_driver.get(linkedin_URL)
+
+        WebDriverWait(thread_driver, WAIT_TIMEOUT).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
-        time.sleep(random.uniform(10, 15))
-        
-        # Scroll để load toàn bộ profile
-        for i in range(5):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * %s);" % ((i+1)/5))
-            time.sleep(2)
-        
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        time.sleep(random.uniform(5, 8))  # tăng delay
+
+        # Scroll chậm hơn
+        for i in range(2):
+            thread_driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
+            time.sleep(random.uniform(1.5, 2.5))
+
+
+        soup = BeautifulSoup(thread_driver.page_source, "html.parser")
         
         # CẤU TRÚC DỮ LIỆU
         profile_data = {
@@ -708,21 +763,51 @@ for idx, linkedin_URL in enumerate(URLs_all_page, 1):
                 print(f"           Công ty: {exp.get('company', 'N/A')}")
                 print(f"           Loại hình: {exp.get('employment_type', 'N/A')}")
                 print(f"           Thời gian: {exp.get('duration', 'N/A')}")
-        
-        profiles_data.append(profile_data)
-        
-        # Lưu tạm sau mỗi 3 profiles
-        if idx % 3 == 0:
-            with open(r"D:\Hoc_tap\linkedlin\Data\output_temp.json", "w", encoding="utf-8") as f:
-                json.dump(profiles_data, f, ensure_ascii=False, indent=4)
-            print(f"    Đã lưu tạm {idx} profiles")
-        
-        # Tăng thời gian chờ giữa các profile
-        time.sleep(random.uniform(15, 20))
-        
+
+        # ===== GỬI KAFKA =====
+        if 'producer' in globals():
+            producer.send(KAFKA_TOPIC, value=profile_data)
+        print("    📤 Đã gửi Kafka")
+
+        time.sleep(random.uniform(4,6))  # delay mạnh hơn
+
+        return profile_data
     except Exception as e:
-        print(f"    Lỗi khi xử lý profile {linkedin_URL}: {e}")
-        continue
+        print(f"❌ Lỗi {linkedin_URL}: {e}")
+        return None
+
+    finally:
+        try:
+            thread_driver.quit()
+        except Exception:
+            pass
+# Task 4: Scrape the data của từng profile
+print("\n=== Bắt đầu thu thập dữ liệu từng profile ===")
+profiles_data = []
+total_profiles = len(URLs_all_page)
+
+print("\n🚀 Bắt đầu crawl đa luồng (5 threads)...")
+
+with ThreadPoolExecutor(max_workers=3) as executor:
+    futures = []
+
+    for idx, url in enumerate(URLs_all_page, 1):
+        if stop_flag:
+            break
+
+        futures.append(
+            executor.submit(crawl_profile, url, idx, total_profiles)
+        )
+
+        time.sleep(random.uniform(2, 4))
+
+    for future in as_completed(futures):
+        try:
+            result = future.result()
+        except Exception as e:
+            print(f"Thread error: {e}")
+            continue
+
 
 # EXPORT JSON FINAL
 output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"
@@ -759,4 +844,8 @@ if profiles_data:
 
 # Đóng trình duyệt
 print("\nĐang đóng trình duyệt...")
+if 'producer' in globals():
+    print("Đang đóng Kafka producer...")
+    producer.flush(timeout=5)
+    producer.close()
 driver.quit()

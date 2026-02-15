@@ -1,7 +1,44 @@
-
 version: '3.8'
 
 services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: linkedin-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      - linkedin-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: linkedin-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - linkedin-network
+
   mongodb:
     image: mongo:4.4
     container_name: linkedin-mongodb
@@ -15,15 +52,13 @@ services:
       - mongodb_data:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "mongo -u admin -p admin123 --authenticationDatabase admin --eval \"db.adminCommand('ping')\" || exit 1"
-        ]
+      test: ["CMD-SHELL", "mongo -u admin -p admin123 --authenticationDatabase admin --eval \"db.adminCommand('ping')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 60s
+    networks:
+      - linkedin-network
 
   redis:
     image: redis:7-alpine
@@ -38,6 +73,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - linkedin-network
 
   app:
     build: .
@@ -49,22 +86,28 @@ services:
       - NODE_ENV=production
       - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/linkedin_candidates?authSource=admin
       - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:29092   # 👈 Dùng listener nội bộ
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_started
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
       - ./data:/app/data
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {if(r.statusCode!==200)throw new Error()})"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
+    networks:
+      - linkedin-network
 
 volumes:
   mongodb_data:
   redis_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+
+networks:
+  linkedin-network:
+    driver: bridge

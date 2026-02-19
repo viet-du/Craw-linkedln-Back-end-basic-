@@ -2,17 +2,17 @@ import json
 import os
 from kafka import KafkaConsumer
 from datetime import datetime
-import threading
 import signal
 import sys
-
 
 # Cấu hình Kafka
 KAFKA_BROKER = 'localhost:9092'
 TOPIC = 'linkedin-profiles'
-BACKUP_DIR = 'backup_data'  # Thư mục lưu file JSON backup
 
-# Tạo thư mục backup nếu chưa tồn tại
+# Thư mục dữ liệu chính (cùng với crawler)
+DATA_DIR = r"D:\Hoc_tap\linkedlin\Data"
+# Thư mục con để lưu backup theo ngày
+BACKUP_DIR = os.path.join(DATA_DIR, 'backup_data')
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # Biến toàn cục để dừng consumer
@@ -32,14 +32,12 @@ def get_backup_filename():
     return os.path.join(BACKUP_DIR, f'profiles_{today}.json')
 
 def write_to_json(data):
-    """Ghi một profile vào file JSON (append)"""
+    """Ghi một profile vào file JSON (append an toàn)"""
     filename = get_backup_filename()
-    # Nếu file chưa tồn tại, ghi mảng mới
     if not os.path.exists(filename):
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump([data], f, ensure_ascii=False, indent=2)
     else:
-        # Đọc file hiện tại, append, ghi lại
         with open(filename, 'r+', encoding='utf-8') as f:
             try:
                 existing = json.load(f)
@@ -51,15 +49,14 @@ def write_to_json(data):
             f.truncate()
 
 def consume_messages():
-    """Consumer chính, lắng nghe Kafka và ghi vào file"""
     consumer = KafkaConsumer(
         TOPIC,
         bootstrap_servers=KAFKA_BROKER,
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-        auto_offset_reset='earliest',  # Đọc từ đầu nếu chưa có offset
+        auto_offset_reset='earliest',
         enable_auto_commit=True,
         group_id='linkedin-backup-group',
-        max_poll_records=100  # Lấy tối đa 100 message mỗi lần poll
+        max_poll_records=100
     )
     
     print(f"✅ Kafka consumer started. Listening to topic '{TOPIC}'")
@@ -76,15 +73,13 @@ def consume_messages():
         batch.append(profile)
         print(f"📥 Received: {profile.get('name', 'Unknown')} (offset {message.offset})")
         
-        # Cứ 10 message hoặc sau 10 giây thì ghi batch
         if len(batch) >= 10 or (datetime.now() - last_commit_time).seconds >= 10:
             for p in batch:
                 write_to_json(p)
-            print(f"💾 Saved {len(batch)} profiles to backup file")
+            print(f"💾 Saved {len(batch)} profiles")
             batch = []
             last_commit_time = datetime.now()
     
-    # Ghi nốt những message còn lại khi dừng
     if batch:
         for p in batch:
             write_to_json(p)

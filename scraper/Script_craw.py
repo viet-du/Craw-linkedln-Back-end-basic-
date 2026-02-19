@@ -19,7 +19,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from selenium.common.exceptions import TimeoutException
-
+import hashlib
+import json
+from datetime import datetime, timedelta
+file_lock = threading.Lock()
+output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"
+# ===== META DATA CONFIG =====
+META_PATH = r"D:\Hoc_tap\linkedlin\Data\crawl_meta.json"  # file lưu thông tin crawl
+MAX_AGE_DAYS = 30  # số ngày tối đa trước khi crawl lại
 stop_flag = False
 
 def signal_handler(sig, frame):
@@ -31,7 +38,16 @@ signal.signal(signal.SIGINT, signal_handler)
 
 # Tăng thời gian timeout
 WAIT_TIMEOUT = 30
-
+def calculate_checksum(profile_data):
+    """Tạo hash từ các trường quan trọng để phát hiện thay đổi."""
+    important = {
+        'name': profile_data.get('name'),
+        'job_title': profile_data.get('job_title'),
+        'location': profile_data.get('location'),
+        'experience': profile_data.get('experience'),
+        'education': profile_data.get('education')
+    }
+    return hashlib.sha256(json.dumps(important, sort_keys=True).encode()).hexdigest()
 # Task 1: Login to Linkedin
 print("=== Bắt đầu đăng nhập LinkedIn ===")
 print("Lưu ý: Bạn có 60 giây để giải captcha nếu có")
@@ -286,30 +302,59 @@ for page in range(input_page):
 URLs_all_page = list(set(URLs_all_page))
 
 # Kiểm tra file output hiện có để bỏ qua những URL đã crawl trước đó
+# ===== ĐỌC METADATA =====
+meta = {}
+if os.path.exists(META_PATH):
+    try:
+        with open(META_PATH, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+    except:
+        meta = {}
+
+# Kết hợp metadata với output.json (nếu có)
 existing_urls = set()
-output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"
-try:
-    if os.path.exists(output_path):
-        with open(output_path, 'r', encoding='utf-8') as ef:
+if os.path.exists(output_path):
+    with open(output_path, 'r', encoding='utf-8') as ef:
+        try:
             existing_data = json.load(ef)
             for item in existing_data:
                 u = item.get('url') or item.get('linkedin_url')
                 if u:
-                    # normalize by stripping query params as in GetURL
                     u_clean = u.split('?')[0]
                     existing_urls.add(u_clean)
-        print(f"  Tìm thấy {len(existing_urls)} URL đã có trong {output_path}, sẽ bỏ qua khi crawl")
-except Exception as e:
-    print(f"  Không thể đọc file output hiện có: {e}")
+                    # Nếu chưa có metadata, tạo mới
+                    if u_clean not in meta:
+                        meta[u_clean] = {
+                            'last_crawled': None,
+                            'checksum': None
+                        }
+        except:
+            pass
 
-# Lọc những URL mới (chưa có trong output.json)
-before_count = len(URLs_all_page)
-URLs_all_page = [u for u in URLs_all_page if u.split('?')[0] not in existing_urls]
-skipped_existing = before_count - len(URLs_all_page)
-if skipped_existing > 0:
-    print(f"  Bỏ qua {skipped_existing} URL đã tồn tại, sẽ crawl {len(URLs_all_page)} URL mới")
+# Lọc URL mới (chưa từng crawl) và URL cũ cần cập nhật
+new_urls = []          # chưa có trong meta
+update_urls = []       # đã có nhưng quá hạn hoặc cần cập nhật
+now = datetime.now()
 
-print(f'\nTổng cộng thu thập được {len(URLs_all_page)} URLs duy nhất')
+for u in URLs_all_page:
+    u_clean = u.split('?')[0]
+    if u_clean not in meta:
+        new_urls.append(u)
+    else:
+        last = meta[u_clean].get('last_crawled')
+        if last:
+            last_date = datetime.fromisoformat(last)
+            if now - last_date > timedelta(days=MAX_AGE_DAYS):
+                update_urls.append(u)   # đã quá hạn, cần crawl lại
+        else:
+            update_urls.append(u)       # chưa có thời gian (dữ liệu cũ)
+
+print(f"✅ URL mới: {len(new_urls)}")
+print(f"🔄 URL cần cập nhật (cũ hơn {MAX_AGE_DAYS} ngày): {len(update_urls)}")
+
+# Kết hợp để crawl
+crawl_urls = new_urls + update_urls
+print(f"📌 Tổng số URL sẽ crawl: {len(crawl_urls)}")
 
 print("\n5 URLs đầu tiên:")
 for i, url in enumerate(URLs_all_page[:5]):
@@ -377,7 +422,8 @@ def crawl_profile(linkedin_URL, idx, total_profiles):
             "total_experience_count": 0,
             "url": linkedin_URL
         }
-        
+        checksum = calculate_checksum(profile_data)
+        profile_data['_checksum'] = checksum
         # 1. LẤY TÊN
         try:
             name_element = soup.find("h1", {"class": lambda x: x and any(cls in str(x) for cls in ["text-heading-xlarge", "t-24", "inline"])})
@@ -804,10 +850,21 @@ with ThreadPoolExecutor(max_workers=3) as executor:
     for future in as_completed(futures):
         try:
             result = future.result()
+            if result:
+                profiles_data.append(result)
+                # Cập nhật metadata
+                url_clean = result['url'].split('?')[0]
+                meta[url_clean] = {
+                    'last_crawled': datetime.now().isoformat(),
+                    'checksum': result.get('_checksum', '')
+                }
+                # Ghi metadata an toàn với lock
+                with file_lock:
+                    with open(META_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(meta, f, indent=4)
         except Exception as e:
             print(f"Thread error: {e}")
             continue
-
 
 # EXPORT JSON FINAL
 output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"

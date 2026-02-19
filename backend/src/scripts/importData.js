@@ -143,7 +143,7 @@ async function importData() {
       useUnifiedTopology: true,
     });
     console.log('✅ Connected to MongoDB');
-    
+    const db = mongoose.connection.db;
     // Ask for file path
     let dataPath = await askQuestion('📂 Enter the path to the JSON file (or press Enter for default): ');
     
@@ -424,7 +424,26 @@ async function importData() {
                    stat._id === 95 ? '95-100' : 'Unknown';
       console.log(`   ${range}: ${stat.count} candidates (avg score: ${stat.avgScore?.toFixed(1) || 'N/A'})`);
     });
-    
+    // ===== GHI LOG VÀO MONGODB =====
+try {
+  const importLog = {
+    source: "linkedin_crawler",
+    import_timestamp: new Date(),
+    file_path: dataPath,
+    total_processed: profiles.length,
+    imported,
+    updated,
+    skipped,
+    errors: errors.length,
+    validation_errors: validationErrors.length,
+    status: errors.length === 0 ? "success" : "partial_failure"
+  };
+//Ghi log vào collection import_logs
+await db.collection('import_logs').insertOne(importLog);
+  console.log('📝 Đã ghi log import vào collection import_logs');
+} catch (logErr) {
+  console.error('⚠️ Không thể ghi log import:', logErr.message);
+}
     // Log import completion
     logger.info('Data import completed', {
       imported,

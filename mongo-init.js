@@ -36,5 +36,10 @@ db.refreshtokens.createIndex({ token: 1 }, { unique: true });        // tra cứ
 db.refreshtokens.createIndex({ userId: 1 });                         // lọc theo user
 db.refreshtokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // tự động xoá khi hết hạn
 db.refreshtokens.createIndex({ userId: 1, revoked: 1 });            // query token còn sống
+// ========== 5. Tạo collection crawl_logs để lưu lịch sử crawl ==========
+db.createCollection('crawl_logs');
 
+db.crawl_logs.createIndex({ crawl_timestamp: -1 });  // index theo thời gian
+db.crawl_logs.createIndex({ source: 1 });            // index theo nguồn
+db.crawl_logs.createIndex({ status: 1 });            // index theo trạng thái
 print('✅ MongoDB initialized successfully – 3 collections ready!');

@@ -71,7 +71,7 @@ Xây dựng hệ thống hoàn chỉnh để:
                        │
     ┌──────────────────┴────────────────────┐
     │    Python Selenium Scraper            │
-    │    (scraper/Script_craw.py)           │
+    │ (Script_craw.py / Script-run(task-table).py) │
     │                                       │
     │  • Chrome WebDriver automation        │
     │  • LinkedIn login handling            │
@@ -193,6 +193,42 @@ Health:    http://localhost:3000/health
 API Docs:  http://localhost:3000/api-docs
 ```
 
+### **Option 3: Chạy Crawler (2 script riêng cho 2 mục đích)**
+
+#### 1. Script chạy bình thường (thủ công, interactive)
+File: `scraper/Script_craw.py`
+
+- Dùng khi cần chạy thủ công.
+- Script sẽ hỏi input trực tiếp trong lúc chạy (thời gian lọc, số trang, số profile...).
+
+```bash
+python scraper/Script_craw.py
+```
+
+#### 2. Script có tham số (dành cho chạy tự động)
+File: `scraper/Script-run(task-table).py`
+
+- Dùng cho Task Scheduler/cron/automation pipeline.
+- Không cần nhập tay nếu truyền tham số đầy đủ.
+
+```bash
+python "scraper/Script-run(task-table).py" --hours 24 --max-profiles 100 --pages 3
+```
+
+**Tham số hỗ trợ:**
+- `--hours`: lọc profile theo số giờ gần nhất
+- `--max-profiles`: giới hạn số profile crawl tối đa
+- `--pages`: số trang kết quả cần quét
+
+#### Kafka backup consumer (đi kèm crawler)
+File: `scraper/kafka_consumer.py`
+
+```bash
+python scraper/kafka_consumer.py
+```
+
+Consumer sẽ đọc topic `linkedin-profiles` và backup theo ngày vào `Data/backup_data/profiles_YYYY-MM-DD.json`.
+
 ---
 
 ## 📁 Cấu Trúc Dự Án Chi Tiết
@@ -247,7 +283,8 @@ linkedlin/
 │   └── uploads/                    ← Uploaded files
 │
 ├── scraper/                        ← Python Selenium Crawler
-│   ├── Script_craw.py/Script-run(task-table).py ← Main crawler/Chạy tự động
+│   ├── Script_craw.py                ← Crawler chạy thường (interactive)
+│   ├── Script-run(task-table).py     ← Crawler có tham số (automation)
 │   ├── kafka_consumer.py           ← Kafka consumer
 │   ├── login.txt                   ← LinkedIn credentials
 │   ├── profiles.txt                ← Profile URLs (một URL/dòng)

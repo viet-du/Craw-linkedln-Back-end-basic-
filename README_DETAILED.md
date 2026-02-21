@@ -247,7 +247,7 @@ linkedlin/
 │   └── uploads/                    ← Uploaded files
 │
 ├── scraper/                        ← Python Selenium Crawler
-│   ├── Script_craw.py              ← Main crawler
+│   ├── Script_craw.py/Script-run(task-table).py ← Main crawler/Chạy tự động
 │   ├── kafka_consumer.py           ← Kafka consumer
 │   ├── login.txt                   ← LinkedIn credentials
 │   ├── profiles.txt                ← Profile URLs (một URL/dòng)

@@ -22,6 +22,43 @@ from selenium.common.exceptions import TimeoutException
 import hashlib
 import json
 from datetime import datetime, timedelta
+import argparse
+
+# Xử lý tham số dòng lệnh
+parser = argparse.ArgumentParser(description='Crawl LinkedIn profiles')
+parser.add_argument('--hours', type=int, default=None, help='Số giờ lọc thời gian (ví dụ 24)')
+parser.add_argument('--max-profiles', type=int, default=None, help='Số profile tối đa cần crawl')
+parser.add_argument('--pages', type=int, default=None, help='Số trang crawl')
+args = parser.parse_args()
+if args.hours is not None:
+    time_filter_input = str(args.hours)
+    print(f"🔹 Tự động lọc {args.hours} giờ qua (do tham số dòng lệnh)")
+else:
+    time_filter_input = input("\nLọc theo thời gian (nhập số giờ, ví dụ 24 cho 24h, ...): ").strip()
+if args.max_profiles is not None:
+    max_profiles = args.max_profiles
+    print(f"🔹 Tự động giới hạn {max_profiles} profile (do tham số dòng lệnh)")
+# Xử lý tham số thời gian thành time_param
+time_param = ""
+if time_filter_input:
+    try:
+        hours = int(time_filter_input)
+        seconds = hours * 3600
+        time_param = f"&f_TPR=r{seconds}"
+        print(f"✅ Sẽ lọc theo {hours} giờ qua")
+    except:
+        print("⚠️ Không hợp lệ, bỏ qua lọc thời gian")
+else:
+    max_profiles_input = input("Số lượng profile tối đa muốn crawl (mặc định: tất cả): ").strip()
+    max_profiles = int(max_profiles_input) if max_profiles_input else None
+if args.pages is not None:
+    input_page = args.pages
+    print(f"🔹 Tự động crawl {input_page} trang (do tham số dòng lệnh)")
+else:
+    try:
+        input_page = int(input('\nBạn muốn crawl bao nhiêu trang? '))
+    except:
+        input_page = 2
 file_lock = threading.Lock()
 output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"
 # ===== META DATA CONFIG =====
@@ -130,29 +167,22 @@ except FileNotFoundError:
     print(f"Lỗi: Không tìm thấy file {profiles_path}")
     profiles = ["data scientist"]
 # ===== HỎI BỘ LỌC THỜI GIAN =====
-time_filter_input = input("\nLọc theo thời gian (nhập số giờ, ví dụ 24 cho 24h, 168 cho 7 ngày, 720 cho 30 ngày, hoặc để trống nếu không lọc): ").strip()
-time_param = ""
-if time_filter_input:
-    try:
-        hours = int(time_filter_input)
-        seconds = hours * 3600
-        time_param = f"&f_TPR=r{seconds}"
-        print(f"✅ Sẽ lọc theo {hours} giờ qua")
-    except:
-        print("⚠️ Không hợp lệ, bỏ qua lọc thời gian")
+if time_filter_input is None:
+    time_filter_input = input("\nLọc theo thời gian (nhập số giờ, ví dụ 24 cho 24h, 168 cho 7 ngày, 720 cho 30 ngày, hoặc để trống nếu không lọc): ").strip()
+else:
+    print(f"✅ Sử dụng tham số: {time_filter_input} giờ")
 
 # ===== LỌC THEO VỊ TRÍ (cố định Việt Nam) =====
 location_urn = "104195383"
 location_param = f"&geoUrn=%5B%22{location_urn}%22%5D"
 print(f"✅ Mặc định lọc theo địa điểm Việt Nam (mã {location_urn})")
 # ===== HỎI GIỚI HẠN SỐ LƯỢNG PROFILE =====
-max_profiles_input = input("Số lượng profile tối đa muốn crawl (mặc định: tất cả): ").strip()
-max_profiles = None
-if max_profiles_input:
-    try:
-        max_profiles = int(max_profiles_input)
-    except:
-        print("⚠️ Không hợp lệ, sẽ crawl tất cả")
+# ===== HỎI GIỚI HẠN SỐ LƯỢNG PROFILE =====
+if max_profiles is None:
+    max_profiles_input = input("Số lượng profile tối đa muốn crawl (mặc định: tất cả): ").strip()
+    max_profiles = int(max_profiles_input) if max_profiles_input else None
+else:
+    print(f"✅ Sử dụng tham số: {max_profiles} profile")
 # Sau khi có các biến time_param, location_param, max_profiles
 for profile in profiles:
     print(f"\n🔎 Tìm kiếm: {profile}")
@@ -198,13 +228,14 @@ def GetURL():
     
     print(f"  Tìm thấy {len(urls)} URLs trong trang hiện tại")
     return urls
-
-try:
-    input_page = int(input('\nBạn muốn crawl bao nhiêu trang? '))
-except:
-    input_page = 2
-
 URLs_all_page = []
+if input_page is None:
+    try:
+        input_page = int(input('\nBạn muốn crawl bao nhiêu trang? '))
+    except:
+        input_page = 2
+else:
+    print(f"✅ Sử dụng tham số: {input_page} trang")
 
 for page in range(input_page):
     print(f"\nĐang xử lý trang {page + 1}/{input_page}")
@@ -388,9 +419,11 @@ def crawl_profile(linkedin_URL, idx, total_profiles):
 
 
     # Gắn lại cookies để khỏi login lại
-    thread_driver.get("https://www.linkedin.com")
     for cookie in cookies:
-        thread_driver.add_cookie(cookie)
+        try:
+            thread_driver.add_cookie(cookie)
+        except:
+            pass
 
     try:
         print(f"\n[{idx}/{total_profiles}] Đang xử lý: {linkedin_URL}")
@@ -791,7 +824,8 @@ def crawl_profile(linkedin_URL, idx, total_profiles):
         # CẬP NHẬT tổng số kinh nghiệm
         profile_data["total_experience_count"] = len(profile_data["experience"])
         
-        
+        checksum = calculate_checksum(profile_data)
+        profile_data['_checksum'] = checksum
         # Hiển thị thông tin đã lấy được
         print(f"    Đã lấy được:")
         print(f"      - Tên: {profile_data['name']}")

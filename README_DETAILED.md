@@ -220,6 +220,33 @@ python "scraper/Script-run(task-table).py" --hours 24 --max-profiles 100 --pages
 - `--max-profiles`: giới hạn số profile crawl tối đa
 - `--pages`: số trang kết quả cần quét
 
+#### 3. Scheduler lặp lịch crawler (APScheduler)
+File: `scraper/scheduler.py`
+
+- Timezone: `Asia/Ho_Chi_Minh`
+- Lịch hiện tại: chạy vào `08:00`, `11:00`, `14:00`, `18:00` mỗi ngày
+- Job thực thi: `run_crawler(hours=24, max_profiles=90, pages=4)`
+
+Chạy scheduler:
+
+```bash
+python scraper/scheduler.py
+```
+
+Sửa mốc giờ lặp trong:
+
+```python
+trigger=CronTrigger(hour='8,11,14,18', minute=0)
+```
+
+Ví dụ đổi thành 2 lần/ngày:
+
+```python
+trigger=CronTrigger(hour='9,21', minute=0)
+```
+
+Nếu muốn lặp theo chu kỳ cố định (vd: mỗi 24 giờ), có thể dùng trigger `interval` (mẫu đã được comment sẵn trong file).
+
 #### Kafka backup consumer (đi kèm crawler)
 File: `scraper/kafka_consumer.py`
 

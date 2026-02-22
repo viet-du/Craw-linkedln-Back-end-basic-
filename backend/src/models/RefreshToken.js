@@ -22,6 +22,10 @@ const refreshTokenSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  revokedAt: {
+    type: Date,
+    default: null,
+  },
   replacedByToken: {
     type: String,
     default: null,
@@ -45,6 +49,15 @@ refreshTokenSchema.statics.hashToken = (token) => {
 refreshTokenSchema.statics.findValid = function (tokenHash, userId) {
   return this.findOne({
     token: tokenHash,
+    userId,
+    revoked: false,
+    expiresAt: { $gt: new Date() },
+  });
+};
+
+// Tìm tất cả token còn sống của user
+refreshTokenSchema.statics.findAllValidByUser = function (userId) {
+  return this.find({
     userId,
     revoked: false,
     expiresAt: { $gt: new Date() },

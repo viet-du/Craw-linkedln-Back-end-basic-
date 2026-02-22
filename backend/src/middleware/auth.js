@@ -11,7 +11,6 @@ async function authenticateToken(req, res, next) {
   const apiKey = req.headers['x-api-key'];
 
   if (!token && !apiKey) {
-    logger.audit('No token or API key', { ip: req.ip });
     return res.status(401).json({ error: 'Access denied', code: 'NO_AUTH_TOKEN' });
   }
 
@@ -66,7 +65,7 @@ function requireRole(roles) {
   };
 }
 
-// -------------------- Tạo token --------------------
+// -------------------- Tạo Access Token --------------------
 function generateToken(user) {
   return jwt.sign(
     {
@@ -84,6 +83,7 @@ function generateToken(user) {
   );
 }
 
+// -------------------- Tạo Refresh Token (lưu vào DB) --------------------
 async function generateRefreshToken(user, deviceInfo = '') {
   const refreshToken = jwt.sign(
     { id: user._id, type: 'refresh' },
@@ -92,6 +92,17 @@ async function generateRefreshToken(user, deviceInfo = '') {
   );
 
   const tokenHash = RefreshToken.hashToken(refreshToken);
+  
+  // Thu hồi tất cả token cũ nếu vượt quá số lượng cho phép (tùy chọn)
+  // Giới hạn số lượng refresh token đồng thời cho mỗi user (ví dụ 5)
+  const MAX_CONCURRENT_TOKENS = 5;
+  const validTokens = await RefreshToken.findAllValidByUser(user._id);
+  if (validTokens.length >= MAX_CONCURRENT_TOKENS) {
+    // Sắp xếp theo createdAt và xóa token cũ nhất
+    validTokens.sort((a, b) => a.createdAt - b.createdAt);
+    await RefreshToken.findByIdAndUpdate(validTokens[0]._id, { revoked: true, revokedAt: new Date() });
+  }
+
   await RefreshToken.create({
     token: tokenHash,
     userId: user._id,
@@ -102,36 +113,63 @@ async function generateRefreshToken(user, deviceInfo = '') {
   return refreshToken;
 }
 
-// -------------------- Xác thực refresh token --------------------
+// -------------------- Xác thực Refresh Token --------------------
 async function verifyRefreshToken(token) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.type !== 'refresh') throw new Error('Invalid token type');
+
     const tokenHash = RefreshToken.hashToken(token);
     const refreshRecord = await RefreshToken.findValid(tokenHash, decoded.id);
-    if (!refreshRecord) throw new Error('Refresh token not found or revoked');
-    return decoded;
+
+    if (!refreshRecord) {
+      throw new Error('Refresh token not found or revoked');
+    }
+
+    return { decoded, recordId: refreshRecord._id };
   } catch (err) {
     throw new Error('Invalid refresh token');
   }
 }
 
-// -------------------- Thu hồi refresh token --------------------
+// -------------------- Thu hồi Refresh Token --------------------
 async function revokeRefreshToken(token, replacedByToken = null) {
   const tokenHash = RefreshToken.hashToken(token);
   const record = await RefreshToken.findOne({ token: tokenHash });
   if (record) {
     record.revoked = true;
+    record.revokedAt = new Date();
     record.replacedByToken = replacedByToken ? RefreshToken.hashToken(replacedByToken) : null;
     await record.save();
   }
 }
 
-async function revokeAllUserRefreshTokens(userId) {
-  await RefreshToken.updateMany(
-    { userId, revoked: false },
-    { $set: { revoked: true } }
-  );
+// -------------------- Thu hồi tất cả Refresh Token của một user --------------------
+async function revokeAllUserRefreshTokens(userId, exceptTokenHash = null) {
+  const query = { userId, revoked: false };
+  const tokens = await RefreshToken.find(query);
+  
+  for (const token of tokens) {
+    if (exceptTokenHash && token.token === exceptTokenHash) continue;
+    token.revoked = true;
+    token.revokedAt = new Date();
+    await token.save();
+  }
+}
+
+// -------------------- Phát hiện token bị đánh cắp (reuse detection) --------------------
+async function detectTokenReuse(tokenHash, userId) {
+  const record = await RefreshToken.findOne({ token: tokenHash });
+  if (!record) return false;
+  
+  if (record.revoked) {
+    // Token này đã bị revoke → có thể đã bị dùng lại bất hợp pháp
+    // Revoke tất cả token của user để bảo vệ
+    await revokeAllUserRefreshTokens(userId);
+    logger.warn(`Token reuse detected for user ${userId}. All tokens revoked.`);
+    return true;
+  }
+  return false;
 }
 
 module.exports = {
@@ -142,4 +180,5 @@ module.exports = {
   verifyRefreshToken,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
+  detectTokenReuse,
 };

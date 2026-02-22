@@ -1,0 +1,34 @@
+2026-02-22 11:16:09,682 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-22 11:16:09,682 - INFO - Added job "job" to job store "default"
+2026-02-22 11:16:09,682 - INFO - Scheduler started
+2026-02-22 11:16:09,682 - INFO - Scheduler \u0111ã kh\u1edfi \u0111\u1ed9ng. Nh\u1ea5n Ctrl+C \u0111\u1ec3 d\u1eebng.
+2026-02-22 11:30:00,083 - INFO - Running job "job (trigger: cron[hour='11', minute='30'], next run at: 2026-02-23 11:30:00 +07)" (scheduled at 2026-02-22 11:30:00+07:00)
+2026-02-22 11:30:00,091 - INFO - B\u1eaft \u0111\u1ea7u job crawl
+2026-02-22 11:31:39,564 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv6 ('::1', 9092, 0, 0)]>: connecting to localhost:9092 [('::1', 9092, 0, 0) IPv6]
+2026-02-22 11:31:39,942 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <checking_api_versions_recv> [IPv6 ('::1', 9092, 0, 0)]>: Broker version identified as 2.6
+2026-02-22 11:31:39,942 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Connection complete.
+2026-02-22 11:33:26,953 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connecting> [IPv6 ('::1', 9092, 0, 0)]>: connecting to localhost:9092 [('::1', 9092, 0, 0) IPv6]
+2026-02-22 11:33:27,001 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Connection complete.
+2026-02-22 11:33:27,001 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Closing connection. 
+2026-02-22 12:03:57,068 - INFO - <KafkaProducer client_id=kafka-python-producer-1 transactional_id=None>: Closing the Kafka producer with 4294967.0 secs timeout.
+2026-02-22 12:03:57,069 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Closing connection. 
+2026-02-22 12:03:57,069 - INFO - K\u1ebft thúc job crawl
+2026-02-22 12:03:57,075 - INFO - Job "job (trigger: cron[hour='11', minute='30'], next run at: 2026-02-23 11:30:00 +07)" executed successfully
+2026-02-22 14:23:31,100 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-22 14:23:31,101 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-22 14:23:31,102 - INFO - Added job "job" to job store "default"
+2026-02-22 14:23:31,102 - INFO - Added job "job" to job store "default"
+2026-02-22 14:23:31,102 - INFO - Scheduler started
+2026-02-22 14:23:31,103 - INFO - Scheduler \u0111ã kh\u1edfi \u0111\u1ed9ng. Nh\u1ea5n Ctrl+C \u0111\u1ec3 d\u1eebng.
+2026-02-22 14:30:00,014 - INFO - Running job "job (trigger: cron[hour='14', minute='30'], next run at: 2026-02-22 14:30:00 +07)" (scheduled at 2026-02-22 14:30:00+07:00)
+2026-02-22 14:30:00,018 - INFO - B\u1eaft \u0111\u1ea7u job crawl
+2026-02-22 14:31:30,820 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connecting> [IPv6 ('::1', 9092, 0, 0)]>: connecting to localhost:9092 [('::1', 9092, 0, 0) IPv6]
+2026-02-22 14:31:31,326 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <checking_api_versions_recv> [IPv6 ('::1', 9092, 0, 0)]>: Broker version identified as 2.6
+2026-02-22 14:31:31,327 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Connection complete.
+2026-02-22 14:33:53,998 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connecting> [IPv6 ('::1', 9092, 0, 0)]>: connecting to localhost:9092 [('::1', 9092, 0, 0) IPv6]
+2026-02-22 14:33:54,001 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Connection complete.
+2026-02-22 14:33:54,002 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=bootstrap-0 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Closing connection. 
+2026-02-22 15:07:19,231 - INFO - <KafkaProducer client_id=kafka-python-producer-1 transactional_id=None>: Closing the Kafka producer with 4294967.0 secs timeout.
+2026-02-22 15:07:19,233 - INFO - <BrokerConnection client_id=kafka-python-producer-1, node_id=1 host=localhost:9092 <connected> [IPv6 ('::1', 9092, 0, 0)]>: Closing connection. 
+2026-02-22 15:07:19,236 - INFO - K\u1ebft thúc job crawl
+2026-02-22 15:07:19,237 - INFO - Job "job (trigger: cron[hour='14', minute='30'], next run at: 2026-02-23 14:30:00 +07)" executed successfully

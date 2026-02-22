@@ -141,11 +141,14 @@ router.put('/users/:id', authenticateToken, requireRole(['admin']), asyncErrorHa
 }));
 
 // -------------------- Xoá user --------------------
+r// Trong route DELETE /users/:id
 router.delete('/users/:id', authenticateToken, requireRole(['admin']), asyncErrorHandler(async (req, res) => {
   const user = await User.findByIdAndDelete(req.params.id);
-  if (!user) throw new NotFoundError('User not found');
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
 
-  // Thu hồi tất cả refresh token trước khi xoá
+  // Thu hồi tất cả refresh token của user trước khi xoá
   await revokeAllUserRefreshTokens(user._id);
 
   logger.audit('User deleted by admin', {
@@ -153,7 +156,7 @@ router.delete('/users/:id', authenticateToken, requireRole(['admin']), asyncErro
     adminUsername: req.user.username,
     deletedUserId: user._id,
     deletedUsername: user.username,
-    ip: req.ip,
+    ip: req.ip
   });
 
   res.json({
@@ -162,8 +165,8 @@ router.delete('/users/:id', authenticateToken, requireRole(['admin']), asyncErro
     data: {
       id: user._id,
       username: user.username,
-      deletedAt: new Date().toISOString(),
-    },
+      deletedAt: new Date().toISOString()
+    }
   });
 }));
 

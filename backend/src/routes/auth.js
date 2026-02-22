@@ -3,15 +3,17 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 const {
   generateToken,
   generateRefreshToken,
   verifyRefreshToken,
   revokeRefreshToken,
   revokeAllUserRefreshTokens,
+  detectTokenReuse,
 } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimit');
-const { asyncErrorHandler, ValidationError } = require('../middleware/errorHandler');
+const { asyncErrorHandler, ValidationError, UnauthorizedError } = require('../middleware/errorHandler');
 const { logger } = require('../utils/logger');
 const { client: redisClient } = require('../utils/redisClient');
 
@@ -131,15 +133,46 @@ router.post('/register', authLimiter, asyncErrorHandler(async (req, res) => {
   });
 }));
 
-// -------------------- Refresh token --------------------
+// -------------------- Refresh token (với token rotation) --------------------
 router.post('/refresh', asyncErrorHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken) {
     throw new ValidationError('Refresh token required', { code: 'MISSING_REFRESH_TOKEN' });
   }
 
+  // Blacklist access token cũ nếu có trong header
+  const authHeader = req.headers['authorization'];
+  if (authHeader) {
+    const oldAccessToken = authHeader.split(' ')[1];
+    if (oldAccessToken && redisClient && redisClient.isOpen) {
+      try {
+        const decoded = jwt.decode(oldAccessToken);
+        if (decoded && decoded.exp) {
+          const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
+          if (expiresIn > 0) {
+            await redisClient.setEx(`blacklist:${oldAccessToken}`, expiresIn, '1');
+          }
+        }
+      } catch (e) {
+        logger.error('Error blacklisting access token', e);
+      }
+    }
+  }
+
   try {
-    const decoded = await verifyRefreshToken(refreshToken);
+    // Kiểm tra token có bị revoke không
+    const tokenHash = require('crypto').createHash('sha256').update(refreshToken).digest('hex');
+    const record = await RefreshToken.findOne({ token: tokenHash });
+    
+    // Phát hiện token bị dùng lại (nếu đã revoke nhưng lại được dùng)
+    if (record && record.revoked) {
+      // Revoke tất cả token của user vì có thể token đã bị đánh cắp
+      await revokeAllUserRefreshTokens(record.userId);
+      logger.warn(`Token reuse detected for user ${record.userId}. All tokens revoked.`);
+      throw new UnauthorizedError('Token compromised, please login again', { code: 'TOKEN_COMPROMISED' });
+    }
+
+    const { decoded, recordId } = await verifyRefreshToken(refreshToken);
     const user = await User.findById(decoded.id);
     if (!user || !user.isActive) {
       return res.status(401).json({ success: false, error: { message: 'Invalid refresh token', code: 'INVALID_REFRESH_TOKEN' } });
@@ -148,6 +181,7 @@ router.post('/refresh', asyncErrorHandler(async (req, res) => {
     // Thu hồi token cũ
     await revokeRefreshToken(refreshToken);
 
+    // Tạo token mới
     const newAccessToken = generateToken(user);
     const newRefreshToken = await generateRefreshToken(user, req.headers['user-agent'] || 'unknown');
 
@@ -164,7 +198,7 @@ router.post('/refresh', asyncErrorHandler(async (req, res) => {
   }
 }));
 
-// -------------------- Logout (thu hồi cả access và refresh) --------------------
+// -------------------- Logout --------------------
 router.post('/logout', asyncErrorHandler(async (req, res) => {
   const authHeader = req.headers['authorization'];
   const accessToken = authHeader && authHeader.split(' ')[1];
@@ -194,11 +228,58 @@ router.post('/logout', asyncErrorHandler(async (req, res) => {
   res.json({ success: true, message: 'Logout successful' });
 }));
 
-// -------------------- Lấy thông tin user hiện tại --------------------
-router.get('/me', asyncErrorHandler(async (req, res) => {
-  if (!req.user) {
-    return res.status(401).json({ success: false, error: { message: 'Not authenticated', code: 'NOT_AUTHENTICATED' } });
+// -------------------- Đổi mật khẩu --------------------
+router.post('/change-password', authenticateToken, asyncErrorHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) {
+    throw new ValidationError('Old and new password required');
   }
+
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+  if (!valid) {
+    throw new UnauthorizedError('Old password is incorrect');
+  }
+
+  if (newPassword.length < 8) {
+    throw new ValidationError('New password must be at least 8 characters');
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  await user.save();
+
+  // Thu hồi tất cả refresh token của user
+  await revokeAllUserRefreshTokens(user._id);
+
+  // Blacklist access token hiện tại nếu muốn
+  const authHeader = req.headers['authorization'];
+  if (authHeader) {
+    const accessToken = authHeader.split(' ')[1];
+    if (accessToken && redisClient && redisClient.isOpen) {
+      try {
+        const decoded = jwt.decode(accessToken);
+        if (decoded && decoded.exp) {
+          const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
+          if (expiresIn > 0) {
+            await redisClient.setEx(`blacklist:${accessToken}`, expiresIn, '1');
+          }
+        }
+      } catch (e) {
+        logger.error('Error blacklisting access token', e);
+      }
+    }
+  }
+
+  logger.audit('Password changed', { userId: user._id, ip: req.ip });
+  res.json({ success: true, message: 'Password changed successfully' });
+}));
+
+// -------------------- Lấy thông tin user hiện tại --------------------
+router.get('/me', authenticateToken, asyncErrorHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-passwordHash -loginAttempts -lockUntil -apiKey');
   if (!user) {
     return res.status(404).json({ success: false, error: { message: 'User not found', code: 'USER_NOT_FOUND' } });

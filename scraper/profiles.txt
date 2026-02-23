@@ -1,1 +1,4 @@
-Cloud Engineer
+System Administrator
+QA Engineer
+Software Tester
+Automation Tester

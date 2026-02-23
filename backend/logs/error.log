@@ -144,3 +144,45 @@
 {"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T06:32:03.605Z","url":"/api/candidates?limit=1000","userId":"anonymous"}
 {"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T06:32:17.674Z","url":"/api/statistics","userId":"anonymous"}
 {"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T06:32:17.691Z","url":"/api/candidates?limit=1000","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T07:34:48.777Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T07:34:58.132Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T07:36:08.446Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T07:36:09.487Z","url":"/js/chart.umd.js.map","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T07:36:17.865Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Limit must be between 1 and 1000 for search","ip":"::1","level":"error","message":"Unhandled error:","method":"GET","stack":"Error: Limit must be between 1 and 1000 for search\n    at D:\\Hoc_tap\\linkedlin\\backend\\src\\routes\\candidates.js:88:11\n    at D:\\Hoc_tap\\linkedlin\\backend\\src\\middleware\\errorHandler.js:53:19\n    at Layer.handle [as handle_request] (D:\\Hoc_tap\\linkedlin\\backend\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at next (D:\\Hoc_tap\\linkedlin\\backend\\node_modules\\express\\lib\\router\\route.js:149:13)\n    at D:\\Hoc_tap\\linkedlin\\backend\\node_modules\\express-rate-limit\\dist\\index.cjs:706:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async D:\\Hoc_tap\\linkedlin\\backend\\node_modules\\express-rate-limit\\dist\\index.cjs:691:5","timestamp":"2026-02-12T07:58:03.993Z","url":"/api/candidates/search?q=Data&limit=9999","userId":"698d5fb0cc503a9a433ca870"}
+{"error":"Bad Request","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":400,"timestamp":"2026-02-12T07:58:04.005Z","url":"/api/candidates/search?q=Data&limit=9999","userId":"698d5fb0cc503a9a433ca870"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:01:17.716Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T08:03:40.249Z","url":"/api/statistics","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T08:03:40.258Z","url":"/api/candidates?limit=1000","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:03:41.054Z","url":"/favicon.ico","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-12T08:04:01.751Z","url":"/api/auth/login","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-12T08:04:09.541Z","url":"/api/auth/login","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-12T08:04:20.229Z","url":"/api/auth/login","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:05:17.916Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:08:54.241Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:08:54.260Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-12T08:09:11.403Z","url":"/.well-known/appspecific/com.chrome.devtools.json","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T09:54:15.791Z","url":"/api/statistics","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-12T09:54:15.797Z","url":"/api/candidates?limit=1000","userId":"anonymous"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:28.203Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:28.465Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:28.493Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:28.622Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:34.044Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:34.366Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:34.810Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:35.331Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:35.944Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:36.665Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:37.484Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:38.400Z"}
+{"level":"error","message":"Redis reconnection failed after 10 attempts","timestamp":"2026-02-12T10:13:39.414Z"}
+{"level":"error","message":"Redis Client Error:","timestamp":"2026-02-12T10:13:39.416Z"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":401,"timestamp":"2026-02-22T08:41:47.549Z","url":"/api/statistics","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":401,"timestamp":"2026-02-22T08:41:48.837Z","url":"/api/candidates?limit=1000","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-22T08:41:49.166Z","url":"/api/auth/refresh","userId":"anonymous"}
+{"error":"Not Found","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":404,"timestamp":"2026-02-22T08:41:49.326Z","url":"/favicon.ico","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-22T08:41:52.414Z","url":"/api/auth/login","userId":"anonymous"}
+{"error":"Unauthorized","ip":"::1","level":"error","message":"Error response","method":"POST","statusCode":401,"timestamp":"2026-02-22T08:41:54.544Z","url":"/api/auth/login","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-22T08:44:39.624Z","url":"/api/statistics","userId":"anonymous"}
+{"error":"Forbidden","ip":"::1","level":"error","message":"Error response","method":"GET","statusCode":403,"timestamp":"2026-02-22T08:44:39.770Z","url":"/api/candidates?limit=1000","userId":"anonymous"}

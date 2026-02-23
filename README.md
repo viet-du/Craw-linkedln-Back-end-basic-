@@ -1,710 +1,319 @@
-# 🔗 LinkedIn Candidates Crawler & Backend API - Tài Liệu Hoàn Chỉnh
+﻿# LinkedIn Candidates Crawler + Backend API
 
-**Tác giả:** Dư Quốc Việt  
-**Ngôn ngữ:** Python (Scraper) + Node.js (Backend) + MongoDB + Redis  
-**Cập nhật:** 15 Tháng 2, 2026  
-**Phiên bản:** 1.0.0  
-**Trạng thái:** Production Ready ✅
+## Tổng quan
 
----
+Dự án gồm 2 phần chính:
 
-## 📖 Mục Lục
+- `scraper/` (Python + Selenium): crawl hồ sơ LinkedIn, đẩy dữ liệu qua Kafka, lưu JSON.
+- `backend/` (Node.js + Express): API quản lý ứng viên, xác thực JWT, phân quyền, thống kê, export dữ liệu.
 
-1. [Tổng Quan Dự Án](#-tổng-quan-dự-án)
-2. [Kiến Trúc Hệ Thống](#-kiến-trúc-hệ-thống)
-3. [Tính Năng Chi Tiết](#-tính-năng-chi-tiết)
-4. [Tech Stack](#-tech-stack)
-5. [Cài Đặt & Khởi Động](#-cài-đặt--khởi-động)
-6. [Cấu Trúc Dự Án](#-cấu-trúc-dự-án)
-7. [API Documentation](#-api-documentation)
-8. [Database Schema](#-database-schema)
-9. [Biến Môi Trường](#-biến-môi-trường)
-10. [Chạy với Docker](#-chạy-với-docker)
-11. [Các Module Chính](#-các-module-chính)
-12. [Troubleshooting](#-troubleshooting)
+Hạ tầng đi kèm:
+
+- MongoDB (lưu dữ liệu)
+- Redis (cache, rate limit, blacklist token)
+- Kafka + Zookeeper (stream và backup dữ liệu crawler)
+- Docker Compose (chạy full stack nhanh)
 
 ---
 
-## 🎯 Tổng Quan Dự Án
+## Kiến trúc nhanh
 
-### Mục Đích
-Xây dựng một hệ thống hoàn chỉnh để:
-- **Thu thập dữ liệu LinkedIn** từ hồ sơ ứng viên (Python Selenium)
-- **Quản lý & lưu trữ** dữ liệu tập trung (MongoDB)
-- **Cung cấp API REST** cho phép tìm kiếm, lọc, xuất dữ liệu
-- **Xác thực & phân quyền** người dùng qua JWT tokens
-- **Đảm bảo hiệu năng** bằng Redis caching & rate limiting
-- **Xác thực chất lượng** dữ liệu tự động
-- **Quản lý hệ thống** cho admin
-
-### Use Cases Chính
-```
-✓ HR / Recruiters     → Tìm kiếm ứng viên theo kỹ năng, kinh nghiệm
-✓ Data Analysts       → Phân tích xu hướng thị trường nhân sự
-✓ Admins              → Quản lý người dùng & giám sát hệ thống
-✓ Developers          → Tích hợp API vào ứng dụng khác
-✓ Business Teams      → Thống kê, báo cáo, dashboard
-```
+1. Crawler login LinkedIn và thu thập profile.
+2. Crawler ghi `Data/output.json` và publish lên Kafka topic `linkedin-profiles`.
+3. `scraper/kafka_consumer.py` nhận dữ liệu và backup theo ngày vào `Data/backup_data/profiles_YYYY-MM-DD.json`.
+4. Backend import dữ liệu JSON vào MongoDB.
+5. Dashboard/API đọc từ MongoDB (kèm cache Redis).
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống
+## Cấu trúc thư mục
 
-```
-┌────────────────────────────────────────────────────────────┐
-│             FRONTEND (HTML/JS/Dashboard)                   │
-│          index.html, login.html, dashboard.html            │
-└──────────────────────┬─────────────────────────────────────┘
-                       │ HTTP/REST (port 3000)
-┌──────────────────────▼─────────────────────────────────────┐
-│              EXPRESS BACKEND (Node.js)                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │Auth Routes   │  │Candidate     │  │Admin Routes      │  │
-│  │-Login/Logout │  │Routes        │  │-User Mgmt        │  │
-│  │-Register     │  │-Search       │  │-Audit Log        │  │
-│  │-Refresh Token│  │-Advanced     │  │-Data Import      │  │
-│  │-API Key      │  │Filter        │  │-Validation       │  │
-│  └──────────────┘  │-Statistics   │  └──────────────────┘  │
-│                    └──────────────┘  ┌──────────────────┐  │
-│                                      │Export Routes     │  │
-│                                      │-CSV, Excel, JSON │  │
-│                                      │-ZIP Archive      │  │
-│                                      └──────────────────┘  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │     MIDDLEWARE (Auth, RateLimit, Error Handler)    │   │
-│  └─────────────────────────────────────────────────────┘   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │DataQuality   │  │Redis Cache   │  │Logger (Winston)  │  │
-│  │Checker       │  │Wrapper       │  │                  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-└──────────────────────┬──────────────────┬──────────────────┘
-                       │                  │
-          MongoDB (27017)        Redis (6379)
-          - candidates           - Cache
-          - users                - Rate Limits
-          - refreshtokens        - Sessions
-                       │
-    ┌──────────────────┴────────────────────┐
-    │    Python Selenium Scraper            │
-    │    (scraper/Script_craw.py)           │
-    │                                       │
-    │  • Chrome WebDriver automation        │
-    │  • LinkedIn login handling            │
-    │  • Profile data extraction            │
-    │  • Multi-threading support           │
-    │  • Graceful shutdown                 │
-    └───────────────────────────────────────┘
-```
-
----
-
-## 🚀 Tính Năng Chi Tiết
-
-### 1. **Xác Thực & Phân Quyền**
-- ✅ JWT Token (8 giờ expiry)
-- ✅ Refresh Token (30 ngày, lưu DB)
-- ✅ API Key authentication
-- ✅ Token revoke/blacklist
-- ✅ Role-based access (Admin, User, Viewer)
-- ✅ Account locking (5 failed logins)
-- ✅ Audit logging
-
-### 2. **Crawl LinkedIn (Python)**
-- ✅ Selenium WebDriver automation
-- ✅ Chrome headless mode
-- ✅ Login & captcha handling
-- ✅ Extract: name, job, skills, experience, education
-- ✅ Screenshot capture
-- ✅ Threading support
-- ⚠️ **Note:** Requires LinkedIn account
-
-### 3. **Tìm Kiếm & Lọc**
-- ✅ Full-text search
-- ✅ Advanced filters (skills, experience, location)
-- ✅ Pagination & sorting
-- ✅ Aggregation & statistics
-- ✅ Multiple filter combinations
-
-### 4. **Rate Limiting**
-- ✅ Redis-backed limits
-- ✅ Different limits per endpoint
-- ✅ Admin bypass
-- ✅ IP + User ID tracking
-
-### 5. **Chất Lượng Dữ Liệu**
-- ✅ Auto-validation
-- ✅ Quality scoring (0-100)
-- ✅ Warnings & recommendations
-- ✅ Data consistency checks
-
-### 6. **Export Multi-Format**
-- ✅ CSV
-- ✅ Excel (.xlsx)
-- ✅ JSON
-- ✅ ZIP bundle
-
-### 7. **Caching & Performance**
-- ✅ Redis caching
-- ✅ TTL-based invalidation
-- ✅ Query optimization
-- ✅ Pagination support
-
-### 8. **Admin Management**
-- ✅ User CRUD
-- ✅ Role management
-- ✅ Password reset
-- ✅ API key generation
-- ✅ Activity tracking
-
----
-
-## 🛠️ Tech Stack
-
-```
-BACKEND:
-├─ Node.js 18+
-├─ Express.js (REST API)
-├─ MongoDB 4.4+ (Database)
-├─ Redis 6+ (Cache & Rate Limiting)
-├─ JWT (Authentication)
-├─ bcryptjs (Password hashing)
-├─ Winston (Logging)
-└─ ExcelJS, json2csv (Export)
-
-SCRAPER:
-├─ Python 3.8+
-├─ Selenium (WebDriver)
-├─ BeautifulSoup4 (HTML parsing)
-├─ Kafka (Message queue - optional)
-└─ Threading (Concurrent crawling)
-
-INFRASTRUCTURE:
-├─ Docker
-├─ Docker Compose
-├─ Zookeeper (Kafka coordinator)
-├─ Kafka (Message broker)
-└─ Nginx (Reverse proxy - optional)
-```
-
----
-
-## 🔧 Cài Đặt & Khởi Động
-
-### **Option 1: Local Development (Không Docker)**
-
-#### 1. Clone Repository
-```bash
-git clone https://github.com/viet-du/Craw-linkedln-Back-end-basic-.git
-cd Craw-linkedln-Back-end-basic-
-```
-
-#### 2. Cài Đặt MongoDB & Redis
-
-**Windows/macOS/Linux** (với Docker - Khuyến nghị):
-```bash
-docker run --name linkedin-mongodb -d -p 27017:27017 \
-  -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=admin123 \
-  mongo:4.4
-
-docker run --name linkedin-redis -d -p 6379:6379 redis:7-alpine
-```
-
-#### 3. Backend Setup
-```bash
-cd backend
-npm install
-```
-
-#### 4. Tạo `.env`
-```bash
-cat > .env << EOF
-NODE_ENV=development
-PORT=3000
-BASE_URL=http://localhost:3000
-MONGODB_URI=mongodb://admin:admin123@localhost:27017/linkedin_candidates?authSource=admin
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your_super_secret_jwt_key_min_32_chars_12345!@#$%
-JWT_EXPIRES_IN=8h
-REFRESH_TOKEN_EXPIRES_IN=30d
-MAX_FILE_SIZE=10485760
-UPLOAD_PATH=./uploads
-LOG_LEVEL=debug
-CORS_ORIGIN=http://localhost:3000
-EOF
-```
-
-#### 5. Start Backend
-```bash
-# Development (with auto-reload)
-npm run dev
-
-# Or production
-npm start
-```
-
-#### 6. Import Demo Data
-```bash
-npm run import
-```
-
-#### 7. Access Application
-```
-Frontend:  http://localhost:3000
-API:       http://localhost:3000/api
-```
-
----
-
-### **Option 2: Docker Compose (Recommended)**
-
-Simply run:
-```bash
-docker-compose up -d
-```
-
-All services start automatically:
-- ✅ Zookeeper, Kafka
-- ✅ MongoDB (with init script)
-- ✅ Redis
-- ✅ Node.js Backend
-
----
-
-## 📁 Cấu Trúc Dự Án
-
-```
+```text
 linkedlin/
-├── backend/                        ← NODE.JS BACKEND
-│   ├── public/                     ← FRONTEND FILES
+├── backend/
+│   ├── public/
 │   │   ├── index.html
 │   │   ├── login.html
 │   │   ├── dashboard.html
-│   │   └── js/
-│   │       └── chart.umd.min.js
+│   │   ├── admin.html
+│   │   ├── authInterceptor.js
+│   │   └── js/chart.umd.min.js
 │   ├── src/
 │   │   ├── middleware/
-│   │   │   ├── auth.js
-│   │   │   ├── errorHandler.js
-│   │   │   └── rateLimit.js
 │   │   ├── models/
-│   │   │   ├── Candidate.js
-│   │   │   ├── User.js
-│   │   │   └── RefreshToken.js
 │   │   ├── routes/
-│   │   │   ├── auth.js
-│   │   │   ├── candidates.js
-│   │   │   ├── admin.js
-│   │   │   └── export.js
-│   │   ├── utils/
-│   │   │   ├── logger.js
-│   │   │   ├── redisClient.js
-│   │   │   ├── dataQuality.js
-│   │   │   └── adapter.js
-│   │   └── scripts/
-│   │       └── importData.js
-│   ├── package.json
-│   └── server.js
-├── scraper/                        ← PYTHON CRAWLER
+│   │   ├── scripts/importData.js
+│   │   └── utils/
+│   ├── server.js
+│   ├── server_local.js
+│   └── package.json
+├── scraper/
 │   ├── Script_craw.py
+│   ├── Script-run(task-table).py
+│   ├── kafka_consumer.py
 │   ├── login.txt
 │   └── profiles.txt
-├── Data/                           ← DATA STORAGE
+├── Data/
+│   ├── output.json
+│   ├── crawl_meta.json
 │   └── backup_data/
 ├── docker-compose.yml
 ├── Dockerfile
-├── mongo-init.js
-└── README_COMPLETE.md
+└── mongo-init.js
 ```
 
 ---
 
-## 📡 API Documentation
+## Yêu cầu môi trường
 
-### **Authentication**
+- Node.js >= 18
+- npm >= 9
+- Python >= 3.8
+- Docker + Docker Compose (khuyến nghị)
+- Chrome + ChromeDriver (cho Selenium)
 
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
+Python package chính:
 
-{
-  "username": "admin",
-  "password": "password123"
-}
-
-Response 200:
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "507f1f77bcf86cd799439011",
-      "username": "admin",
-      "role": "admin"
-    },
-    "tokens": {
-      "accessToken": "eyJhbGc...",
-      "refreshToken": "eyJhbGc...",
-      "expiresIn": 28800
-    }
-  }
-}
-```
-
-#### Register
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "username": "newuser",
-  "password": "password123",
-  "email": "user@example.com"
-}
-
-Response 201: User created
-```
-
-#### Refresh Token
-```http
-POST /api/auth/refresh
-Content-Type: application/json
-
-{
-  "refreshToken": "eyJhbGc..."
-}
-
-Response 200:
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJhbGc..."
-  }
-}
-```
-
-### **Candidates**
-
-#### Search
-```http
-GET /api/candidates/search?q=python
-Authorization: Bearer {accessToken}
-
-Response 200:
-{
-  "success": true,
-  "data": [...candidates],
-  "total": 120,
-  "pagination": {...}
-}
-```
-
-#### Advanced Filter
-```http
-GET /api/candidates/advanced?
-  skills=Python,JavaScript&
-  min_exp=3&
-  max_exp=10&
-  location=Ho%20Chi%20Minh
-Authorization: Bearer {accessToken}
-
-Response 200: (candidates matching filters)
-```
-
-#### Get Details
-```http
-GET /api/candidates/{id}
-Authorization: Bearer {accessToken}
-
-Response 200: (full candidate object)
-```
-
-#### Statistics
-```http
-GET /api/candidates/statistics/summary
-Authorization: Bearer {accessToken}
-
-Response 200:
-{
-  "success": true,
-  "data": {
-    "totalCandidates": 500,
-    "avgExperience": 5.2,
-    "avgScore": 78.5,
-    "avgQuality": 85.3
-  }
-}
-```
-
-### **Admin**
-
-#### Manage Users
-```http
-GET /api/admin/users          → List all users
-POST /api/admin/users         → Create user
-PUT /api/admin/users/{id}     → Update user
-DELETE /api/admin/users/{id}  → Delete user
-
-Authorization: Bearer {accessToken}
-Role: admin required
-```
-
-#### Import Data
-```http
-POST /api/admin/upload
-
-Form Data:
-- file: candidates.json
-
-Response 200:
-{
-  "success": true,
-  "message": "Imported 500 candidates",
-  "stats": {
-    "imported": 500,
-    "skipped": 10,
-    "errors": 0
-  }
-}
-```
-
-### **Export**
-
-```http
-GET /api/export/csv?limit=1000
-GET /api/export/excel?limit=1000
-GET /api/export/json?limit=1000
-GET /api/export/zip?format=all
-
-Authorization: Bearer {accessToken}
-
-Response: File download (CSV, Excel, JSON, or ZIP)
-```
+- `selenium`
+- `beautifulsoup4`
+- `kafka-python`
 
 ---
 
-## 🗄️ Database Schema
-
-### **Collections**
-
-#### `candidates`
-```javascript
-{
-  _id: ObjectId,
-  name: String (required, indexed, text),
-  job_title: String (required),
-  location: String,
-  linkedin_url: String (unique),
-  skills: [String],
-  experience: [{
-    position: String,
-    company: String,
-    duration: String,
-    duration_months: Number
-  }],
-  education: [{
-    school: String,
-    degree: String,
-    degree_level: String
-  }],
-  total_experience_count: Number,
-  score: Number (0-100),
-  data_quality_score: Number,
-  status: String,
-  crawled_at: Date,
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-#### `users`
-```javascript
-{
-  _id: ObjectId,
-  username: String (unique),
-  passwordHash: String,
-  email: String (unique, sparse),
-  role: String enum('admin', 'user'),
-  isActive: Boolean,
-  lastLogin: Date,
-  loginAttempts: Number,
-  lockUntil: Date,
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-#### `refreshtokens`
-```javascript
-{
-  _id: ObjectId,
-  token: String (unique),
-  userId: ObjectId,
-  userAgent: String,
-  expiresAt: Date (TTL auto-delete),
-  revoked: Boolean,
-  createdAt: Date
-}
-```
-
----
-
-## 🔐 Biến Môi Trường
-
-Create `backend/.env`:
+## Chạy nhanh bằng Docker Compose (khuyến nghị)
 
 ```bash
+docker-compose up -d
+docker-compose ps
+docker-compose logs -f app
+```
+
+Các service:
+
+- Backend: `http://localhost:3000`
+- MongoDB: `localhost:27017`
+- Redis: `localhost:6379`
+- Kafka: `localhost:9092`
+
+Dừng:
+
+```bash
+docker-compose down
+docker-compose down -v
+```
+
+---
+
+## Chạy backend local
+
+### 1) Cấu hình `.env`
+
+Tạo file `backend/.env`:
+
+```env
 NODE_ENV=development
 PORT=3000
-BASE_URL=http://localhost:3000
-
 MONGODB_URI=mongodb://admin:admin123@localhost:27017/linkedin_candidates?authSource=admin
 REDIS_URL=redis://localhost:6379
 REDIS_TTL=3600
-
-JWT_SECRET=your_very_long_secret_key_min_32_chars_12345!@#$%
+JWT_SECRET=your_super_secret_min_32_chars
 JWT_EXPIRES_IN=8h
-REFRESH_TOKEN_EXPIRES_IN=30d
-
 MAX_FILE_SIZE=10485760
 UPLOAD_PATH=./uploads
-
-LOG_LEVEL=debug
-LOG_PATH=./logs
-
-CORS_ORIGIN=http://localhost:3000
-KAFKA_BROKERS=localhost:9092
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+ADMIN_EMAIL=admin@example.com
 ```
 
----
+### 2) Cài và chạy
 
-## 🐳 Chạy với Docker
-
-### Quick Start
 ```bash
-docker-compose up -d
-docker-compose logs -f app
-docker-compose ps
+cd backend
+npm install
+npm run dev
 ```
 
-### Stop & Cleanup
+Endpoints nhanh:
+
+- `GET /health`
+- `GET /api-docs`
+- UI: `http://localhost:3000/`
+
+---
+
+## Crawler: 2 script đúng mục đích
+
+Trong project có **2 script crawler chính** như bạn nói:
+
+### 1) Script chạy bình thường (interactive)
+
+File: `scraper/Script_craw.py`
+
+- Chạy thủ công, hỏi input trong lúc chạy (thời gian lọc, số trang, số profile...).
+- Phù hợp khi test nhanh hoặc vận hành thủ công.
+
+Chạy:
+
 ```bash
-docker-compose down
-docker-compose down -v  # Remove volumes
+python scraper/Script_craw.py
 ```
 
-### Access Services
+### 2) Script có tham số (dành cho chạy tự động)
+
+File: `scraper/Script-run(task-table).py`
+
+- Hỗ trợ tham số CLI để tích hợp Task Scheduler/cron/CI.
+- Dùng khi muốn automation ổn định, không nhập tay.
+
+Ví dụ:
+
 ```bash
-# MongoDB
-docker exec -it linkedin-mongodb mongosh -u admin -p admin123 --authenticationDatabase admin
-
-# Redis
-docker exec -it linkedin-redis redis-cli
-
-# View logs
-docker-compose logs app -f
+python "scraper/Script-run(task-table).py" --hours 24 --max-profiles 100 --pages 3
 ```
 
----
+Tham số:
 
-## 🔌 Các Module Chính
-
-### 1. **Authentication** (`src/middleware/auth.js`)
-- JWT token generation & verification
-- Refresh token management
-- API key authentication
-- Token blacklist (revoke)
-- Role-based access control
-
-### 2. **Rate Limiting** (`src/middleware/rateLimit.js`)
-- Redis-backed rate limiting
-- Different limits per endpoint
-- IP + User ID tracking
-- Admin bypass
-
-### 3. **Data Quality** (`src/utils/dataQuality.js`)
-- Profile validation
-- Quality scoring (0-100)
-- Automatic warnings
-
-### 4. **Caching** (`src/utils/redisClient.js`)
-- Redis connectivity
-- TTL-based caching
-- Cache invalidation
-
-### 5. **Logging** (`src/utils/logger.js`)
-- Winston logger
-- Multiple log files
-- Audit trail
-
-### 6. **Error Handler** (`src/middleware/errorHandler.js`)
-- Custom error classes
-- Centralized error handling
-- Async error wrapper
+- `--hours`: lọc profile theo số giờ gần nhất.
+- `--max-profiles`: giới hạn số profile crawl tối đa.
+- `--pages`: số trang kết quả cần quét.
 
 ---
 
-## ⚠️ Troubleshooting
+## Lặp lịch crawler (scheduler)
 
-### MongoDB Connection Failed
+File: `scraper/scheduler.py`
+
+- Dùng `APScheduler` với timezone `Asia/Ho_Chi_Minh`.
+- Job hiện tại đang chạy theo cron tại các mốc: `08:00`, `11:00`, `14:00`, `18:00` mỗi ngày.
+- Job gọi hàm crawl với tham số: `run_crawler(hours=24, max_profiles=90, pages=4)`.
+
+Chạy scheduler:
+
 ```bash
-docker run -d -p 27017:27017 \
-  -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=admin123 \
-  mongo:4.4
+python scraper/scheduler.py
 ```
 
-### Redis Connection Failed
+Nếu muốn đổi mốc giờ lặp, sửa dòng:
+
+```python
+trigger=CronTrigger(hour='8,11,14,18', minute=0)
+```
+
+Ví dụ chỉ chạy 2 lần/ngày:
+
+```python
+trigger=CronTrigger(hour='9,21', minute=0)
+```
+
+Nếu muốn chạy theo chu kỳ cố định (ví dụ mỗi 24 giờ) thay vì theo giờ cố định trong ngày, dùng job `interval` (đã có mẫu comment trong file).
+
+---
+
+## Kafka backup consumer
+
+File: `scraper/kafka_consumer.py`
+
+- Consume topic `linkedin-profiles`.
+- Backup theo ngày vào `Data/backup_data/profiles_YYYY-MM-DD.json`.
+
+Chạy:
+
 ```bash
-docker run -d -p 6379:6379 redis:7-alpine
+python scraper/kafka_consumer.py
 ```
 
-### JWT Token Expired
-Use refresh token: `POST /api/auth/refresh`
+---
 
-### Rate Limit Exceeded
-Wait for time window or use admin account.
+## Import dữ liệu vào MongoDB
 
-### Port Already in Use
+Từ backend:
+
 ```bash
-lsof -i :3000  # Find process
-kill -9 <PID>  # Kill process
-PORT=3001 npm run dev  # Use different port
+cd backend
+npm run import
 ```
 
-### CORS Error
-Update `.env`: `CORS_ORIGIN=http://localhost:3000`
+Script import cho phép:
+
+- Upsert (cập nhật nếu tồn tại)
+- Insert only (bỏ qua bản ghi đã có)
+- Replace all (xóa cũ rồi import lại)
 
 ---
 
-## 📊 Performance Tips
+## API chính
 
-- Index frequently searched fields
-- Use `.lean()` for readonly queries
-- Cache expensive aggregations
-- Paginate results (default limit=20)
-- Enable gzip compression
-- Monitor database slow queries
-- Setup Redis for caching
+### Auth
+
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+### Candidates
+
+- `GET /api/candidates`
+- `GET /api/candidates/search?q=...`
+- `GET /api/candidates/advanced-search?...`
+- `GET /api/candidates/statistics/summary`
+- `GET /api/candidates/statistics/distributions?type=job_title|skills|location|education_level`
+- `GET /api/candidates/top/experience`
+- `GET /api/candidates/top/education`
+- `POST /api/candidates`
+- `PUT /api/candidates/:id`
+- `DELETE /api/candidates/:id`
+- `POST /api/candidates/validate`
+- `POST /api/candidates/batch-validate`
+
+### Admin
+
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `PUT /api/admin/users/:id`
+- `DELETE /api/admin/users/:id`
+- `POST /api/admin/import`
+- `DELETE /api/admin/batch`
+- `PATCH /api/admin/batch`
+- `GET /api/admin/export`
+- `GET /api/admin/statistics`
+- `POST /api/admin/clear-cache`
+- `GET /api/admin/data-quality-report`
+
+### Export
+
+- `GET /api/export/csv`
+- `GET /api/export/excel`
+- `GET /api/export/json`
+- `GET /api/export/with-photos` (admin)
+- `GET /api/export/bulk` (admin)
 
 ---
 
-## 📞 Support
+## Bảo mật và lưu ý
 
-**Author:** Dư Quốc Việt
-
-**GitHub:** [viet-du/Craw-linkedln-Back-end-basic-](https://github.com/viet-du/Craw-linkedln-Back-end-basic-)
-
-**Report Issues:** Create GitHub issue with error details and reproduction steps.
-
----
-
-## 📜 License
-
-MIT License
+- Không commit `scraper/login.txt` (chứa credential thật).
+- Đổi ngay tài khoản admin mặc định trước khi triển khai thật.
+- Cấu hình `JWT_SECRET` mạnh.
+- Tuân thủ chính sách sử dụng dữ liệu và điều khoản LinkedIn.
 
 ---
 
-**Last Updated:** February 15, 2026  
-**Version:** 1.0.0  
-**Status:** ✅ Production Ready
+## Troubleshooting nhanh
+
+- Backend không lên:
+- Kiểm tra `MONGODB_URI`, `REDIS_URL`, `JWT_SECRET` trong `.env`.
+- Xem log tại `backend/logs/`.
+
+- Token hết hạn:
+- Gọi `POST /api/auth/refresh` với refresh token.
+
+- Crawler lỗi:
+- Kiểm tra Chrome/ChromeDriver tương thích.
+- Kiểm tra Kafka đang chạy tại `localhost:9092`.
+
+---
+
+## License
+
+MIT

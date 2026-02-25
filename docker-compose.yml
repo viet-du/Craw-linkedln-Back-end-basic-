@@ -80,13 +80,13 @@ services:
     image: docker.redpanda.com/redpandadata/console:v3.3.2
     container_name: linkedin-kafka-console
     restart: unless-stopped
-    entrypoint: /bin/sh
     command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    entrypoint: /bin/sh
     environment:
       CONFIG_FILEPATH: /tmp/config.yml
       CONSOLE_CONFIG_FILE: |
         kafka:
-          brokers: ["kafka:9092"]
+          brokers: ["kafka:29092"]
     ports:
       - "8080:8080"
     networks:
@@ -113,53 +113,65 @@ services:
       - linkedin-network
 
   airflow-scheduler:
-    image: apache/airflow:2.8.1-python3.9
+    image: apache/airflow:2.7.3-python3.9
     container_name: linkedin-airflow-scheduler
     restart: unless-stopped
     depends_on:
       postgres-airflow:
         condition: service_healthy
-      # 👇 Đã xóa tham chiếu đến redpanda
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
-      AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092  # 👈 Sửa thành kafka://kafka:9092
+      _PIP_ADDITIONAL_REQUIREMENTS: -r /requirements.txt
+      SELENIUM_REMOTE_URL: http://selenium:4444/wd/hub
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/requirements.txt:/requirements.txt
+      - ./Data:/opt/airflow/data
     networks:
       - linkedin-network
-    command: >
-      bash -c "
-        pip install -r /requirements.txt &&
-        airflow scheduler
-      "  # 👈 Đã xóa "ss"
+    command: scheduler
 
   airflow-webserver:
-    image: apache/airflow:2.8.1-python3.9
+    image: apache/airflow:2.7.3-python3.9
     container_name: linkedin-airflow-webserver
     restart: unless-stopped
     depends_on:
       - airflow-scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
-      AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:9092  # 👈 Sửa tương tự
+      _PIP_ADDITIONAL_REQUIREMENTS: -r /requirements.txt
+      SELENIUM_REMOTE_URL: http://selenium:4444/wd/hub
+      AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:29092
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/requirements.txt:/requirements.txt
+      - ./Data:/opt/airflow/data
     ports:
       - "8081:8080"
     networks:
       - linkedin-network
     command: webserver
+
+  selenium:
+    image: selenium/standalone-chrome:126.0
+    container_name: linkedin-selenium
+    restart: unless-stopped
+    shm_size: 2gb
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    networks:
+      - linkedin-network
 
   app:
     build: .
@@ -182,7 +194,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
-      - ./data:/app/data
+      - ./Data:/app/data
     networks:
       - linkedin-network
 
@@ -197,3 +209,4 @@ volumes:
 networks:
   linkedin-network:
     driver: bridge
+

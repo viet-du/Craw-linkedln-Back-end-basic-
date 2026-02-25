@@ -1031,3 +1031,127 @@ curl -X POST http://localhost:3000/api/candidates/validate \
 **Last Updated:** February 19, 2026  
 **Version:** 1.1.0  
 **Status:** ✅ Production Ready
+
+---
+
+## Airflow + Kafka Pipeline Update (2026-02-25)
+
+### Main pipeline flow
+Current production flow in Airflow:
+
+```text
+crawl LinkedIn -> consume Kafka -> validate null fields -> import MongoDB
+```
+
+### Recommended DAG
+Use this DAG as the main pipeline:
+- `linkedin_crawl_consume_validate_import`
+
+Task order:
+1. `crawl_linkedin`
+2. `consume_kafka_messages`
+3. `validate_profiles`
+4. `import_to_mongodb`
+5. `log_summary`
+
+### Null-check rules in `validate_profiles`
+- `name` is null/empty: drop profile
+- `education.school` is null/empty: drop that education item
+- `experience.company` is null/empty: drop that experience item
+- `education.degree` is null: accepted
+
+### DAGs to pause (avoid duplicate processing)
+- `linkedin_crawler_only`
+- `linkedin_mongodb_import`
+- `kafka_consumer_dag`
+- `kafka_sensor_dag`
+
+---
+
+## Docker Notes For Realtime Pipeline
+
+Required services:
+- `kafka`
+- `redpanda-console` (http://localhost:8080)
+- `airflow-scheduler`
+- `airflow-webserver` (http://localhost:8081)
+- `selenium`
+
+Important compose settings:
+- Airflow data mount: `./Data:/opt/airflow/data`
+- Kafka internal broker: `kafka:29092`
+- Selenium remote URL: `http://selenium:4444/wd/hub`
+
+---
+
+## Quick Runbook
+
+Start all services:
+```bash
+docker compose up -d
+```
+
+Start only webserver if it is stuck at `Created`:
+```bash
+docker compose up -d airflow-webserver
+```
+
+Trigger main DAG by CLI:
+```bash
+docker exec linkedin-airflow-scheduler airflow dags unpause linkedin_crawl_consume_validate_import
+docker exec linkedin-airflow-scheduler airflow dags trigger linkedin_crawl_consume_validate_import
+docker exec linkedin-airflow-scheduler airflow tasks list linkedin_crawl_consume_validate_import
+```
+
+Check runtime logs:
+```bash
+docker logs -f linkedin-airflow-scheduler
+docker logs -f linkedin-airflow-webserver
+docker logs -f linkedin-kafka-console
+```
+
+---
+
+## Common Issues And Fixes
+
+### 1) Redpanda console keeps restarting
+Cause: wrong entrypoint (for example `/bin/shf`).
+
+Fix:
+```yaml
+redpanda-console:
+  entrypoint: /bin/sh
+  command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+```
+
+### 2) Airflow dependency conflict after adding Kafka provider
+Symptom: error like `apache-airflow-providers-standard needs Apache Airflow 2.10.0+`.
+
+Stable fix for Airflow 2.7.3:
+- Do not install `apache-airflow-providers-apache-kafka`
+- Keep using `kafka-python` / `confluent-kafka` directly in DAG code
+
+### 3) Restart/recreate commands
+Quick restart:
+```bash
+docker compose restart airflow-scheduler airflow-webserver redpanda-console
+```
+
+Recreate after changing env/compose:
+```bash
+docker compose up -d --force-recreate airflow-scheduler airflow-webserver redpanda-console
+```
+
+---
+
+## Pre-demo Checklist
+
+1. `docker compose ps` shows all core services `Up`.
+2. Airflow UI opens at `http://localhost:8081`.
+3. Redpanda console opens at `http://localhost:8080`.
+4. DAG `linkedin_crawl_consume_validate_import` run is `success`.
+5. `Data/pipeline_runs/` contains:
+   - `consumed_*.json`
+   - `validated_*.json`
+6. MongoDB `candidates` collection has imported data.
+

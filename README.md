@@ -81,6 +81,32 @@ Xây dựng hệ thống hoàn chỉnh để:
     └───────────────────────────────────────┘
 ```
 
+### Airflow Kafka Architecture Update
+
+```text
+LinkedIn Crawler (Selenium)
+  -> publish topic: linkedin-profiles (Kafka)
+  -> Airflow DAG: linkedin_crawl_consume_validate_import
+      1) crawl_linkedin
+      2) consume_kafka_messages
+      3) validate_profiles (null checklist)
+      4) import_to_mongodb
+      5) log_summary
+  -> MongoDB collection: candidates
+
+Monitoring:
+  - Airflow UI: http://localhost:8081
+  - Redpanda Console: http://localhost:8080
+```
+
+Operational notes:
+- Main DAG already includes full chain: `crawl -> consume -> validate -> import`.
+- Pause old DAGs to avoid duplicated writes:
+  - `linkedin_crawler_only`
+  - `linkedin_mongodb_import`
+  - `kafka_consumer_dag`
+  - `kafka_sensor_dag`
+
 ---
 
 ## 🛠️ Tech Stack
@@ -113,6 +139,35 @@ INFRASTRUCTURE:
 ├─ Kafka 7.3 (Message broker)
 └─ MongoDB 4.4 & Redis 7
 ```
+
+### Airflow Related Folders Update
+
+```text
+airflow/
+├── dags/
+│   ├── linkedin_pipeline.py        # Main DAG: crawl -> consume -> validate -> import
+│   ├── linkedin_check_dag.py       # Output quality monitor DAG
+│   ├── linkedin_crawler_dag.py     # Legacy DAG (should pause)
+│   ├── linkedin_import_dag.py      # Legacy DAG (should pause)
+│   ├── kafka_consumer_dag.py       # Legacy DAG (should pause)
+│   └── scripts/
+│       ├── crawler.py              # Crawler used by Airflow + Selenium remote
+│       ├── login.txt
+│       └── profiles.txt
+├── requirements.txt                # Python deps for Airflow container
+└── logs/                           # Scheduler/task run logs
+
+Data/
+├── output.json                     # Crawled output from script
+├── crawl_meta.json                 # Crawl metadata
+└── pipeline_runs/
+    ├── consumed_*.json             # Batch consumed from Kafka/output
+    └── validated_*.json            # Batch after null validation
+```
+
+Docker path notes:
+- Airflow mount: `./Data:/opt/airflow/data`
+- Backend mount: `./Data:/app/data`
 
 ---
 

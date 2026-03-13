@@ -141,7 +141,7 @@ router.put('/users/:id', authenticateToken, requireRole(['admin']), asyncErrorHa
 }));
 
 // -------------------- Xoá user --------------------
-r// Trong route DELETE /users/:id
+// Trong route DELETE /users/:id
 router.delete('/users/:id', authenticateToken, requireRole(['admin']), asyncErrorHandler(async (req, res) => {
   const user = await User.findByIdAndDelete(req.params.id);
   if (!user) {

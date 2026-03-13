@@ -126,12 +126,15 @@ services:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       _PIP_ADDITIONAL_REQUIREMENTS: -r /requirements.txt
       SELENIUM_REMOTE_URL: http://selenium:4444/wd/hub
+      LINKEDIN_PROFILES_PATH: /opt/airflow/scraper/profiles.txt
+      LINKEDIN_LOGIN_PATH: /opt/airflow/scraper/login.txt
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/requirements.txt:/requirements.txt
       - ./Data:/opt/airflow/data
+      - ./scraper:/opt/airflow/scraper:ro
     networks:
       - linkedin-network
     command: scheduler
@@ -150,12 +153,15 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: -r /requirements.txt
       SELENIUM_REMOTE_URL: http://selenium:4444/wd/hub
       AIRFLOW_CONN_KAFKA_DEFAULT: kafka://kafka:29092
+      LINKEDIN_PROFILES_PATH: /opt/airflow/scraper/profiles.txt
+      LINKEDIN_LOGIN_PATH: /opt/airflow/scraper/login.txt
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
       - ./airflow/requirements.txt:/requirements.txt
       - ./Data:/opt/airflow/data
+      - ./scraper:/opt/airflow/scraper:ro
     ports:
       - "8081:8080"
     networks:

@@ -26,7 +26,7 @@ file_lock = threading.Lock()
 output_path = r"D:\Hoc_tap\linkedlin\Data\output.json"
 # ===== META DATA CONFIG =====
 META_PATH = r"D:\Hoc_tap\linkedlin\Data\crawl_meta.json"  # file lưu thông tin crawl
-MAX_AGE_DAYS = 30  # số ngày tối đa trước khi crawl lại
+MAX_AGE_DAYS = 7  # số ngày tối đa trước khi crawl lại
 stop_flag = False
 # ===== FILTER OPTIONS =====
 TIME_FILTERS = {

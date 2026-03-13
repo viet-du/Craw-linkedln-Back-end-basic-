@@ -6,6 +6,7 @@ crawl -> consume kafka -> validate null fields -> import mongodb
 from __future__ import annotations
 
 from airflow import DAG
+from airflow.exceptions import AirflowSkipException
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
@@ -40,9 +41,12 @@ MONGO_URI = os.getenv(
 DATA_DIR = Path("/opt/airflow/data")
 OUTPUT_FILE = DATA_DIR / "output.json"
 RUN_DIR = DATA_DIR / "pipeline_runs"
+NULL_ERROR_DIR = DATA_DIR / "crawler_null_errors"
 RUN_DIR.mkdir(parents=True, exist_ok=True)
+NULL_ERROR_DIR.mkdir(parents=True, exist_ok=True)
 
 CRAWLER_SCRIPT = "/opt/airflow/dags/scripts/crawler.py"
+MAX_NULL_RATIO = float(os.getenv("VALIDATION_MAX_NULL_RATIO", "0.4"))
 
 
 def _safe_run_id(raw: str) -> str:
@@ -117,6 +121,7 @@ def validate_profiles(**context):
         profiles = json.load(f)
 
     valid_profiles = []
+    severe_null_profiles = []
     dropped_profiles = 0
     dropped_education_items = 0
     dropped_experience_items = 0
@@ -127,13 +132,47 @@ def validate_profiles(**context):
             continue
 
         name = profile.get("name")
-        if not _is_non_empty(name):
-            dropped_profiles += 1
-            continue
+        linkedin_key = profile.get("linkedin_url") or profile.get("url")
 
         education = profile.get("education") or []
         if not isinstance(education, list):
             education = []
+
+        experience = profile.get("experience") or []
+        if not isinstance(experience, list):
+            experience = []
+
+        has_school = any(
+            isinstance(edu, dict) and _is_non_empty(edu.get("school"))
+            for edu in education
+        )
+        has_company = any(
+            isinstance(exp, dict) and _is_non_empty(exp.get("company"))
+            for exp in experience
+        )
+
+        # Trường hợp dữ liệu quá rỗng: chỉ còn link, không tên + không trường + không công ty
+        if (
+            _is_non_empty(linkedin_key)
+            and (not _is_non_empty(name))
+            and (not has_school)
+            and (not has_company)
+        ):
+            severe_null_profiles.append(
+                {
+                    "linkedin_url": linkedin_key,
+                    "name": profile.get("name"),
+                    "education": profile.get("education"),
+                    "experience": profile.get("experience"),
+                    "reason": "missing_name_school_company_only_link",
+                }
+            )
+            dropped_profiles += 1
+            continue
+
+        if not _is_non_empty(name):
+            dropped_profiles += 1
+            continue
 
         valid_education = []
         for edu in education:
@@ -150,10 +189,6 @@ def validate_profiles(**context):
                     "duration": edu.get("duration"),
                 }
             )
-
-        experience = profile.get("experience") or []
-        if not isinstance(experience, list):
-            experience = []
 
         valid_experience = []
         for exp in experience:
@@ -182,12 +217,25 @@ def validate_profiles(**context):
     with validated_file.open("w", encoding="utf-8") as f:
         json.dump(valid_profiles, f, ensure_ascii=False, indent=2)
 
+    null_error_file = NULL_ERROR_DIR / f"crawler_null_{run_id}.json"
+    with null_error_file.open("w", encoding="utf-8") as f:
+        json.dump(severe_null_profiles, f, ensure_ascii=False, indent=2)
+
+    total_input = len(profiles)
+    severe_null_ratio = (len(severe_null_profiles) / total_input) if total_input else 0.0
+    allow_import = total_input > 0 and severe_null_ratio <= MAX_NULL_RATIO
+
     metrics = {
-        "total_input": len(profiles),
+        "total_input": total_input,
         "valid_profiles": len(valid_profiles),
         "dropped_profiles": dropped_profiles,
         "dropped_education_items": dropped_education_items,
         "dropped_experience_items": dropped_experience_items,
+        "severe_null_profiles": len(severe_null_profiles),
+        "severe_null_ratio": round(severe_null_ratio, 4),
+        "max_null_ratio": MAX_NULL_RATIO,
+        "allow_import": allow_import,
+        "null_error_file": str(null_error_file),
     }
 
     log.info("Validation metrics: %s", metrics)
@@ -198,6 +246,13 @@ def validate_profiles(**context):
 
 def import_to_mongodb(**context):
     log = logging.getLogger(__name__)
+    metrics = context["ti"].xcom_pull(key="validation_metrics", task_ids="validate_profiles") or {}
+
+    if not metrics.get("allow_import", True):
+        raise AirflowSkipException(
+            "Import blocked: severe null ratio is higher than threshold. "
+            f"See {metrics.get('null_error_file')}"
+        )
 
     validated_file = context["ti"].xcom_pull(key="validated_file", task_ids="validate_profiles")
     if not validated_file:
@@ -254,7 +309,7 @@ def import_to_mongodb(**context):
 
 def log_summary(**context):
     log = logging.getLogger(__name__)
-    validation = context["ti"].xcom_pull(task_ids="validate_profiles") or {}
+    validation = context["ti"].xcom_pull(key="validation_metrics", task_ids="validate_profiles") or {}
     mongo = context["ti"].xcom_pull(task_ids="import_to_mongodb") or {}
 
     log.info("Pipeline completed")

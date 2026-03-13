@@ -21,17 +21,17 @@ from datetime import datetime, timedelta
 import argparse
 from pytz import timezone
 from datetime import datetime
-# ========== Cáº¤U HÃŒNH & BIáº¾N TOÃ€N Cá»¤C ==========
+# ========== CẤU HÌNH & BIẾN TOÀN CỤC ==========
 file_lock = threading.Lock()
 output_path = os.getenv("LINKEDIN_OUTPUT_PATH", "/opt/airflow/data/output.json")
 META_PATH = os.getenv("LINKEDIN_META_PATH", "/opt/airflow/data/crawl_meta.json")
-MAX_AGE_DAYS = 30
+MAX_AGE_DAYS = 7
 stop_flag = False
 WAIT_TIMEOUT = 30
 
 def signal_handler(sig, frame):
     global stop_flag
-    print("\nðŸ›‘ Äang dá»«ng an toÃ n... Vui lÃ²ng chá» hoÃ n táº¥t profile hiá»‡n táº¡i...")
+    print("\nĐang dừng an toàn... Vui lòng chờ hoàn tất profile hiện tại...")
     stop_flag = True
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -57,33 +57,33 @@ def calculate_checksum(profile_data):
 
 def run_crawler(hours=None, max_profiles=None, pages=None):
     """
-    HÃ m chÃ­nh thá»±c hiá»‡n quy trÃ¬nh crawl LinkedIn.
-    CÃ¡c tham sá»‘:
-        hours: sá»‘ giá» lá»c (int hoáº·c None)
-        max_profiles: giá»›i háº¡n profile (int hoáº·c None)
-        pages: sá»‘ trang crawl (int ho None)
+    Hàm chính thực hiện quy trình crawl LinkedIn.
+    Các tham số:
+        hours: số giờ lọc (int hoặc None)
+        max_profiles: giới hạn profile (int hoặc None)
+        pages: số trang crawl (int hoặc None)
     """
     global stop_flag
 
-    # ===== Xá»¬ LÃ THAM Sá» =====
+    # ===== XỬ LÝ THAM SỐ =====
     time_param = ""
     if hours:
         time_param = f"&f_TPR=r{hours*3600}"
-        print(f"âœ… Sáº½ lá»c theo {hours} giá» qua")
+        print(f"Sẽ lọc theo {hours} giờ qua")
 
     location_urn = "104195383"
     location_param = f"&geoUrn=%5B%22{location_urn}%22%5D"
-    print(f"âœ… Máº·c Ä‘á»‹nh lá»c theo Ä‘á»‹a Ä‘iá»ƒm Viá»‡t Nam (mÃ£ {location_urn})")
+    print(f"Mặc định lọc theo địa điểm Việt Nam (mã {location_urn})")
 
-    # ===== ÄÄ‚NG NHáº¬P =====
-    print("=== Báº¯t Ä‘áº§u Ä‘Äƒng nháº­p LinkedIn ===")
-    print("LÆ°u Ã½: Báº¡n cÃ³ 60 giÃ¢y Ä‘á»ƒ giáº£i captcha náº¿u cÃ³")
+    # ===== ĐĂNG NHẬP =====
+    print("=== Bắt đầu đăng nhập LinkedIn ===")
+    print("Lưu ý: Bạn có 60 giây để giải captcha nếu có")
 
     driver = create_driver()
     driver.get('https://www.linkedin.com/checkpoint/lg/sign-in-another-account?trk=guest_homepage-basic_nav-header-signin')
     sleep(2)
 
-    credential_path = os.getenv("LINKEDIN_LOGIN_PATH", "/opt/airflow/dags/scripts/login.txt")
+    credential_path = os.getenv("LINKEDIN_LOGIN_PATH", "/opt/airflow/scraper/login.txt")
     try:
         with open(credential_path, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
@@ -91,9 +91,9 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
             password = lines[1] if len(lines) > 1 else ""
         print('- Finish importing the login credentials')
     except FileNotFoundError:
-        print(f"Lá»—i: KhÃ´ng tÃ¬m tháº¥y file {credential_path}")
-        username = input("Nháº­p username/email: ")
-        password = input("Nháº­p password: ")
+        print(f"Lỗi: Không tìm thấy file {credential_path}")
+        username = input("Nhập username/email: ")
+        password = input("Nhập password: ")
 
     sleep(2)
 
@@ -108,7 +108,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
 
         signin_field = driver.find_element(By.XPATH, '//*[@id="organic-div"]/form/div[3]/button')
         signin_field.click()
-        print('ÄÃ£ click Ä‘Äƒng nháº­p. Báº¡n cÃ³ 60 giÃ¢y Ä‘á»ƒ giáº£i captcha...')
+        print('Đã click đăng nhập. Bạn có 60 giây để giải captcha...')
         sleep(60)
 
         print('- Finish Task 1: Login to Linkedin')
@@ -123,38 +123,45 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
             retries=5,
             acks='all'
         )
-        print("âœ… Kafka Producer Ä‘Ã£ khá»Ÿi táº¡o")
+        print("Kafka Producer đã khởi tạo")
 
     except Exception as e:
-        print(f"Lá»—i Ä‘Äƒng nháº­p: {e}")
+        print(f"Lỗi đăng nhập: {e}")
         driver.quit()
         return
 
-    # ===== Äá»ŒC DANH SÃCH Tá»ª KHÃ“A =====
-    profiles_path = os.getenv("LINKEDIN_PROFILES_PATH", "/opt/airflow/dags/scripts/profiles.txt")
+    # ===== ĐỌC DANH SÁCH TỪ KHÓA =====
+    profiles_path = os.getenv("LINKEDIN_PROFILES_PATH", "/opt/airflow/scraper/profiles.txt")
     try:
         with open(profiles_path, "r", encoding="utf-8") as f:
             all_profiles = [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
-        print(f"Lá»—i: KhÃ´ng tÃ¬m tháº¥y file {profiles_path}")
+        print(f"Lỗi: Không tìm thấy file {profiles_path}")
         all_profiles = ["data scientist"]
 
-    # Chá»n keyword dá»±a trÃªn giá» hiá»‡n táº¡i
+    # Chọn keyword dựa trên giờ hiện tại
     current_hour = datetime.now(timezone('Asia/Ho_Chi_Minh')).hour
-# Map giá» sang index (0-based)
+# Map giờ sang index (0-based)
     hour_to_index = {8: 0, 11: 1, 14: 2, 18: 3}
+    ignore_hour_filter = os.getenv("LINKEDIN_IGNORE_HOUR_FILTER", "0") == "1"
     if current_hour in hour_to_index and len(all_profiles) > hour_to_index[current_hour]:
         profiles = [all_profiles[hour_to_index[current_hour]]]
-        print(f"ðŸ”¹ Giá» {current_hour}: chá»‰ crawl tá»« khÃ³a '{profiles[0]}'")
+        print(f"Giờ {current_hour}: chỉ crawl từ khóa '{profiles[0]}'")
+    elif ignore_hour_filter and all_profiles:
+        profiles = [all_profiles[0]]
+        print(
+            f"Bỏ chặn giờ để test nhanh (LINKEDIN_IGNORE_HOUR_FILTER=1), "
+            f"dùng từ khóa '{profiles[0]}'"
+        )
     else:
-        print(f"â­ï¸ Giá» {current_hour} khÃ´ng náº±m trong lá»‹ch crawl, thoÃ¡t.")
+        print(f"Giờ {current_hour} không nằm trong lịch crawl, thoát.")
         driver.quit()
         producer.close()
         return
-    # ===== TÃŒM KIáº¾M CHO Tá»ªNG Tá»ª KHÃ“A =====
+    # ===== TÌM KIẾM CHO TỪNG TỪ KHÓA =====
     URLs_all_page = []
     for profile in profiles:
-        print(f"\nðŸ”Ž TÃ¬m kiáº¿m: {profile}")
+        print(f"\nTìm kiếm: {profile}")
         search_url = f"https://www.linkedin.com/search/results/people/?keywords={profile.replace(' ', '%20')}&origin=GLOBAL_SEARCH_HEADER{time_param}{location_param}"
         driver.get(search_url)
         time.sleep(5)
@@ -165,13 +172,13 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
         profile_cards = soup.find_all("div", {"class": ["search-result", "reusable-search__result-container", "entity-result"]})
-        print(f"  ðŸ“Š TÃ¬m tháº¥y {len(profile_cards)} profile cards")
+        print(f"  Tìm thấy {len(profile_cards)} profile cards")
         time.sleep(3)
 
-    print("\n=== HoÃ n thÃ nh Task 2: TÃ¬m kiáº¿m profiles ===")
+    print("\n=== Hoàn thành Task 2: Tìm kiếm profiles ===")
 
-    # ===== THU THáº¬P URLs =====
-    print("\n=== Báº¯t Ä‘áº§u thu tháº­p URLs ===")
+    # ===== THU THẬP URLs =====
+    print("\n=== Bắt đầu thu thập URLs ===")
 
     def GetURL():
         soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -186,22 +193,22 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                     urls.append(clean)
         return urls
 
-    # XÃ¡c Ä‘á»‹nh sá»‘ trang
+    # Xác định số trang
     if pages is None:
         try:
-            pages = int(input('\nBáº¡n muá»‘n crawl bao nhiÃªu trang? '))
+            pages = int(input('\nBạn muốn crawl bao nhiêu trang? '))
         except:
             pages = 2
     else:
-        print(f"âœ… Sá»­ dá»¥ng tham sá»‘: {pages} trang")
+        print(f"Sử dụng tham số: {pages} trang")
 
     URLs_all_page = []
     for page in range(pages):
-        print(f"\nÄang xá»­ lÃ½ trang {page+1}/{pages}")
+        print(f"\nĐang xử lý trang {page+1}/{pages}")
         page_urls = GetURL()
         URLs_all_page.extend(page_urls)
         URLs_all_page = list(set(URLs_all_page))
-        print(f"  ÄÃ£ thu tháº­p {len(page_urls)} URLs, tá»•ng {len(URLs_all_page)}")
+        print(f"  Đã thu thập {len(page_urls)} URLs, tổng {len(URLs_all_page)}")
 
         if page < pages - 1:
             try:
@@ -214,7 +221,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
             except:
                 break
 
-    # ===== Lá»ŒC URL Dá»°A TRÃŠN METADATA =====
+    # ===== LỌC URL DỰA TRÊN METADATA =====
     meta = {}
     if os.path.exists(META_PATH):
         try:
@@ -244,7 +251,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
 
     if max_profiles and len(URLs_all_page) > max_profiles:
         URLs_all_page = URLs_all_page[:max_profiles]
-        print(f"ðŸ” Giá»›i háº¡n {max_profiles} URLs sáº½ xá»­ lÃ½")
+        print(f"Giới hạn {max_profiles} URLs sẽ xử lý")
 
     for u in URLs_all_page:
         u_clean = u.split('?')[0]
@@ -263,21 +270,21 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                 update_urls.append(u)
 
     crawl_urls = new_urls + update_urls
-    print(f"âœ… URL má»›i: {len(new_urls)}")
-    print(f"ðŸ”„ URL cáº§n cáº­p nháº­t (cÅ© hÆ¡n {MAX_AGE_DAYS} ngÃ y): {len(update_urls)}")
-    print(f"ðŸ“Œ Tá»•ng sá»‘ URL sáº½ crawl: {len(crawl_urls)}")
+    print(f"URL mới: {len(new_urls)}")
+    print(f"URL cần cập nhật (cũ hơn {MAX_AGE_DAYS} ngày): {len(update_urls)}")
+    print(f"Tổng số URL sẽ crawl: {len(crawl_urls)}")
 
     if not crawl_urls:
-        print("ðŸš« KhÃ´ng cÃ³ URL nÃ o cáº§n crawl. Káº¿t thÃºc.")
+        print("Không có URL nào cần crawl. Kết thúc.")
         driver.quit()
         producer.close()
         return
 
-    print("\n5 URLs Ä‘áº§u tiÃªn sáº½ crawl:")
+    print("\n5 URLs đầu tiên sẽ crawl:")
     for i, url in enumerate(crawl_urls[:5]):
         print(f"  {i+1}. {url}")
 
-    # ===== HÃ€M CRAWL Má»˜T PROFILE (Ä‘Æ°á»£c gá»i tá»« cÃ¡c thread) =====
+    # ===== HÀM CRAWL MỘT PROFILE (được gọi từ các thread) =====
         def crawl_profile(linkedin_url, idx, total):
             global stop_flag
             if stop_flag:
@@ -304,32 +311,32 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
             max_retries = 2
             for attempt in range(max_retries):
                 try:
-                    print(f"\n[{idx}/{total}] Äang xá»­ lÃ½ (láº§n {attempt+1}): {linkedin_url}")
+                    print(f"\n[{idx}/{total}] Đang xử lý (lần {attempt+1}): {linkedin_url}")
                     thread_driver.set_page_load_timeout(60)
                     thread_driver.get(linkedin_url)
                     WebDriverWait(thread_driver, WAIT_TIMEOUT).until(
                         EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
-                    # Load thÃ nh cÃ´ng, thoÃ¡t vÃ²ng láº·p retry
+                    # Load thành công, thoát vòng lặp retry
                     break
                 except TimeoutException as e:
-                    print(f"    âš ï¸ Láº§n {attempt+1} timeout: {e}")
+                    print(f"    Lần {attempt+1} timeout: {e}")
                     if attempt == max_retries - 1:
                         thread_driver.quit()
                         return None
                     time.sleep(random.uniform(10, 15))
                 except Exception as e:
-                    print(f"    âš ï¸ Láº§n {attempt+1} lá»—i khÃ¡c: {e}")
+                    print(f"    Lần {attempt+1} lỗi khác: {e}")
                     if attempt == max_retries - 1:
                         thread_driver.quit()
                         return None
                     time.sleep(random.uniform(5, 10))
             else:
-                # Náº¿u vÃ²ng láº·p káº¿t thÃºc mÃ  khÃ´ng break (tá»©c lÃ  táº¥t cáº£ cÃ¡c láº§n Ä‘á»u tháº¥t báº¡i)
+                # Nếu vòng lặp kết thúc mà không break (tức là tất cả các lần đều thất bại)
                 thread_driver.quit()
                 return None
 
-            # ----- Scroll vÃ  parse dá»¯ liá»‡u -----
+            # ----- Scroll và parse dữ liệu -----
             try:
                 time.sleep(random.uniform(5, 8))
                 for _ in range(2):
@@ -347,7 +354,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                     "url": linkedin_url
                 }
 
-                # Láº¥y tÃªn
+                # Lấy tên
                 try:
                     name_elem = soup.find("h1", {"class": lambda x: x and any(cls in str(x) for cls in ["text-heading-xlarge", "t-24", "inline"])})
                     if name_elem:
@@ -355,7 +362,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                 except:
                     pass
 
-                # Láº¥y chá»©c vá»¥
+                # Lấy chức vụ
                 try:
                     job_elem = soup.find("div", {"class": lambda x: x and any(cls in str(x) for cls in ["text-body-medium", "break-words"])})
                     if job_elem:
@@ -363,7 +370,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                 except:
                     pass
 
-                # Láº¥y Ä‘á»‹a Ä‘iá»ƒm
+                # Lấy địa điểm
                 try:
                     loc_elem = soup.find("span", {"class": lambda x: x and "text-body-small" in str(x) and "t-black--light" in str(x) and "break-words" in str(x)})
                     if loc_elem:
@@ -371,15 +378,15 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                 except:
                     pass
 
-                # ----- Láº¥y kinh nghiá»‡m -----
-                print("    Äang láº¥y thÃ´ng tin kinh nghiá»‡m...")
+                # ----- Lấy kinh nghiệm -----
+                print("    Đang lấy thông tin kinh nghiệm...")
                 try:
                     all_sections = soup.find_all("section")
                     for section in all_sections:
                         h2_tag = section.find("h2")
                         if h2_tag:
                             section_title = h2_tag.get_text(strip=True).lower()
-                            if "experience" in section_title or "kinh nghiá»‡m" in section_title or "work" in section_title:
+                            if "experience" in section_title or "kinh nghiệm" in section_title or "work" in section_title:
                                 exp_items = section.find_all("li", {"class": lambda x: x and any(cls in str(x) for cls in ["artdeco-list__item", "pvs-list__item"])})
                                 for item in exp_items:
                                     if len(item.get_text(strip=True)) < 10:
@@ -393,8 +400,8 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                                     company_span = item.find("span", {"class": lambda x: x and "t-14" in str(x) and "t-normal" in str(x)})
                                     if company_span:
                                         company_text = company_span.get_text(strip=True)
-                                        if "Â·" in company_text:
-                                            parts = company_text.split("Â·")
+                                        if "·" in company_text:
+                                            parts = company_text.split("·")
                                             exp_data["company"] = parts[0].strip()
                                             exp_data["employment_type"] = parts[1].strip() if len(parts) > 1 else None
                                         else:
@@ -403,7 +410,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                                     if time_span:
                                         exp_data["duration"] = time_span.get_text(strip=True)
 
-                                    skip_keywords = ["university", "college", "school", "academy", "institute", "certified", "follower", "theo dÃµi", "member"]
+                                    skip_keywords = ["university", "college", "school", "academy", "institute", "certified", "follower", "theo dõi", "member"]
                                     should_add = True
                                     if exp_data["position"]:
                                         for kw in skip_keywords:
@@ -413,17 +420,17 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                                     if should_add and (exp_data["position"] or exp_data["company"]):
                                         profile_data["experience"].append(exp_data)
                 except Exception as e:
-                    print(f"    Lá»—i khi láº¥y kinh nghiá»‡m: {e}")
+                    print(f"    Lỗi khi lấy kinh nghiệm: {e}")
 
-                # ----- Láº¥y há»c váº¥n -----
-                print("    Äang láº¥y thÃ´ng tin há»c váº¥n...")
+                # ----- Lấy học vấn -----
+                print("    Đang lấy thông tin học vấn...")
                 try:
                     all_sections = soup.find_all("section")
                     for section in all_sections:
                         h2_tag = section.find("h2")
                         if h2_tag:
                             section_title = h2_tag.get_text(strip=True).lower()
-                            if "education" in section_title or "há»c váº¥n" in section_title:
+                            if "education" in section_title or "học vấn" in section_title:
                                 edu_items = section.find_all("li", {"class": lambda x: x and any(cls in str(x) for cls in ["artdeco-list__item", "pvs-list__item"])})
                                 for item in edu_items:
                                     if len(item.get_text(strip=True)) < 10:
@@ -442,7 +449,7 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                                         edu_data["duration"] = time_span.get_text(strip=True)
 
                                     company_keywords = ["gmbh", "ltd", "inc", "corp", "company", "technologies", "software", "solution", "group", "holding", "consulting"]
-                                    non_edu_keywords = ["follower", "following", "theo dÃµi", "thÃ nh viÃªn", "member", "connect", "káº¿t ná»‘i", "certified"]
+                                    non_edu_keywords = ["follower", "following", "theo dõi", "thành viên", "member", "connect", "kết nối", "certified"]
                                     should_add = True
                                     if edu_data["school"]:
                                         school_lower = edu_data["school"].lower()
@@ -453,35 +460,35 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
                                     if should_add and edu_data["school"]:
                                         profile_data["education"].append(edu_data)
                 except Exception as e:
-                    print(f"    Lá»—i khi láº¥y há»c váº¥n: {e}")
+                    print(f"    Lỗi khi lấy học vấn: {e}")
 
-                # Cáº­p nháº­t tá»•ng sá»‘ kinh nghiá»‡m
+                # Cập nhật tổng số kinh nghiệm
                 profile_data["total_experience_count"] = len(profile_data["experience"])
 
-                # TÃ­nh checksum
+                # Tính checksum
                 checksum = calculate_checksum(profile_data)
                 profile_data['_checksum'] = checksum
 
-                # Hiá»ƒn thá»‹ thÃ´ng tin Ä‘Ã£ láº¥y
-                print(f"    ÄÃ£ láº¥y Ä‘Æ°á»£c: {profile_data['name']} - {len(profile_data['experience'])} jobs, {len(profile_data['education'])} schools")
+                # Hiển thị thông tin đã lấy
+                print(f"    Đã lấy được: {profile_data['name']} - {len(profile_data['experience'])} jobs, {len(profile_data['education'])} schools")
 
-                # Gá»­i Kafka
+                # Gửi Kafka
                 if producer:
                     producer.send(KAFKA_TOPIC, value=profile_data)
-                    print("    ðŸ“¤ ÄÃ£ gá»­i Kafka")
+                    print("    Đã gửi Kafka")
 
                 time.sleep(random.uniform(4, 6))
                 return profile_data
 
             except Exception as e:
-                print(f"âŒ Lá»—i {linkedin_url}: {e}")
+                print(f"Lỗi {linkedin_url}: {e}")
                 return None
             finally:
                 thread_driver.quit()
-    # ===== CRAWL ÄA LUá»’NG =====
+    # ===== CRAWL ĐA LUỒNG =====
     profiles_data = []
     total_profiles = len(crawl_urls)
-    print(f"\n=== Báº¯t Ä‘áº§u crawl {total_profiles} profiles vá»›i 3 threads ===")
+    print(f"\n=== Bắt đầu crawl {total_profiles} profiles với 3 threads ===")
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
@@ -507,25 +514,25 @@ def run_crawler(hours=None, max_profiles=None, pages=None):
             except Exception as e:
                 print(f"Thread error: {e}")
 
-    # ===== LÆ¯U Káº¾T QUáº¢ =====
+    # ===== LƯU KẾT QUẢ =====
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(profiles_data, f, ensure_ascii=False, indent=4)
 
-    print(f"\n=== HOÃ€N THÃ€NH ===")
-    print(f"ÄÃ£ crawl thÃ nh cÃ´ng {len(profiles_data)} profiles")
-    print(f"Dá»¯ liá»‡u Ä‘Ã£ lÆ°u vÃ o {output_path}")
+    print(f"\n=== HOÀN THÀNH ===")
+    print(f"Đã crawl thành công {len(profiles_data)} profiles")
+    print(f"Dữ liệu đã lưu vào {output_path}")
 
-    # ===== Dá»ŒN Dáº¸P =====
+    # ===== DỌN DẸP =====
     driver.quit()
     if producer:
         producer.flush()
         producer.close()
 
-# ===== ÄIá»‚M VÃ€O KHI CHáº Y Äá»˜C Láº¬P =====
+# ===== ĐIỂM VÀO KHI CHẠY ĐỘC LẬP =====
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Crawl LinkedIn profiles')
-    parser.add_argument('--hours', type=int, help='Sá»‘ giá» lá»c thá»i gian')
-    parser.add_argument('--max-profiles', type=int, help='Sá»‘ profile tá»‘i Ä‘a cáº§n crawl')
-    parser.add_argument('--pages', type=int, help='Sá»‘ trang crawl')
+    parser.add_argument('--hours', type=int, help='Số giờ lọc thời gian')
+    parser.add_argument('--max-profiles', type=int, help='Số profile tối đa cần crawl')
+    parser.add_argument('--pages', type=int, help='Số trang crawl')
     args = parser.parse_args()
     run_crawler(hours=args.hours, max_profiles=args.max_profiles, pages=args.pages)

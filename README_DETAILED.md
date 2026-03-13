@@ -6,6 +6,10 @@
 **Phiên bản:** 1.1.0  
 **Trạng thái:** Production Ready ✅
 
+**Tai lieu chinh:** File nay (`README_DETAILED.md`) la tai lieu chinh cua du an.
+
+**Cap nhat moi:** Chinh sach recrawl theo metadata checksum da doi tu 30 ngay xuong 7 ngay de uu tien cap nhat du lieu moi lien tuc.
+
 ---
 
 ## 📚 TABLE OF CONTENTS
@@ -898,6 +902,7 @@ curl -H "Authorization: Bearer {token}" \
 **Thông tin:**
 - `last_crawled` - Lần crawl gần nhất
 - `checksum` - Để detect changes (unchanged = same hash)
+- `MAX_AGE_DAYS = 7` - Neu profile qua 7 ngay se duoc dua vao danh sach recrawl de tranh bo sot thay doi moi
 
 ### **Logs/** - Application Logs
 
